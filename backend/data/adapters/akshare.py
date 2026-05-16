@@ -1,3 +1,4 @@
+from __future__ import annotations
 import akshare as ak
 from backend.data.adapters.base import MarketDataAdapter, CompanyInfo
 

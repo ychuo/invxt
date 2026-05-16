@@ -1,3 +1,4 @@
+from __future__ import annotations
 from neo4j import GraphDatabase, Driver
 from backend.config import settings
 from backend.kg.schemas import Entity, Relation, EntityType, RelationType

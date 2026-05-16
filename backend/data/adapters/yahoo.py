@@ -1,3 +1,4 @@
+from __future__ import annotations
 import yfinance as yf
 from backend.data.adapters.base import MarketDataAdapter, CompanyInfo
 

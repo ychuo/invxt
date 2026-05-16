@@ -1,3 +1,4 @@
+from __future__ import annotations
 import uuid
 import asyncio
 from dataclasses import dataclass, field

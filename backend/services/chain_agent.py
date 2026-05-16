@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 from backend.services.llm_client import LLMClient
 from backend.kg.neo4j_client import Neo4jClient

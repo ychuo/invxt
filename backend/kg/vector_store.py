@@ -1,3 +1,4 @@
+from __future__ import annotations
 import psycopg2
 from pgvector.psycopg2 import register_vector
 from backend.config import settings
