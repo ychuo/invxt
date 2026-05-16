@@ -77,7 +77,11 @@ export default function IndustryChainGraph({ data }: Props) {
   const [showCompanies, setShowCompanies] = useState(false);
   const [highlightNode, setHighlightNode] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const dragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const toggleFullscreen = useCallback(() => setFullscreen((f) => !f), []);
   const toggleTech = useCallback((techId: string) => {
@@ -242,7 +246,37 @@ export default function IndustryChainGraph({ data }: Props) {
   );
 
   const handleSvgClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === svgRef.current) setHighlightNode(null);
+    if (e.target === e.currentTarget) setHighlightNode(null);
+  }, []);
+
+  // Pan & zoom handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.target === containerRef.current || (e.target as HTMLElement).tagName === 'svg') {
+      dragging.current = true;
+      dragStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+    }
+  }, [pan]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!dragging.current) return;
+    setPan({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y });
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    dragging.current = false;
+  }, []);
+
+  // Attach wheel listener natively (React onWheel is passive, can't preventDefault)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      setZoom((z) => Math.min(5, Math.max(0.2, z * delta)));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
   if (!data || data.nodes.length === 0) {
@@ -261,12 +295,26 @@ export default function IndustryChainGraph({ data }: Props) {
     : "relative h-96 border rounded-lg overflow-hidden group";
 
   const svgContent = (
-    <svg
-      ref={svgRef}
-      viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-      className="w-full h-full"
-      onClick={handleSvgClick}
+    <div
+      ref={containerRef}
+      className="w-full h-full overflow-hidden cursor-grab active:cursor-grabbing select-none"
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
     >
+      <div
+        style={{
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          transformOrigin: "0 0",
+          transition: "transform 0.05s ease-out",
+        }}
+      >
+        <svg
+          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+          style={{ width: svgWidth, height: svgHeight, minWidth: svgWidth }}
+          onClick={handleSvgClick}
+        >
       {/* Grid lines */}
       <defs>
         {[0, 1, 2, 3].map((col) => {
@@ -350,7 +398,9 @@ export default function IndustryChainGraph({ data }: Props) {
           </g>
         );
       })}
-    </svg>
+        </svg>
+      </div>
+    </div>
   );
 
   return (
