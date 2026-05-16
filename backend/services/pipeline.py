@@ -136,7 +136,7 @@ class AnalysisPipeline:
             await self._emit(state)
             return state
 
-        # Persist/update theme node under original topic name
+        # Persist theme node + chain structure in graph
         try:
             theme = ThemeEntity(
                 name=topic,
@@ -145,6 +145,37 @@ class AnalysisPipeline:
                 aliases=[display_name] if display_name != topic else [],
             )
             self._neo4j.merge_entity(theme)
+
+            # Create technology/material/equipment nodes and relationships
+            from backend.kg.schemas import (
+                TechnologyEntity, MaterialEntity, EquipmentEntity,
+                Relation, RelationType,
+            )
+            for chain in state.chain_results:
+                tech_name = chain.get("direction", "")
+                if not tech_name:
+                    continue
+                tech = TechnologyEntity(name=tech_name)
+                self._neo4j.merge_entity(tech)
+                self._neo4j.create_relation(Relation(
+                    from_name=topic, to_name=tech_name, type=RelationType.REQUIRES,
+                ))
+
+                for mat_name in chain.get("key_materials", []):
+                    if mat_name:
+                        mat = MaterialEntity(name=mat_name)
+                        self._neo4j.merge_entity(mat)
+                        self._neo4j.create_relation(Relation(
+                            from_name=tech_name, to_name=mat_name, type=RelationType.USES_MATERIAL,
+                        ))
+
+                for eq_name in chain.get("key_equipment", []):
+                    if eq_name:
+                        eq = EquipmentEntity(name=eq_name)
+                        self._neo4j.merge_entity(eq)
+                        self._neo4j.create_relation(Relation(
+                            from_name=tech_name, to_name=eq_name, type=RelationType.USES_EQUIPMENT,
+                        ))
         except Exception:
             pass
 

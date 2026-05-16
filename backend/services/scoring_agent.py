@@ -74,7 +74,19 @@ class ScoringAgent:
         return scored
 
     def write_to_graph(self, theme_name: str, scored_companies: list[dict]):
+        from backend.kg.schemas import CompanyEntity, Market
         for company in scored_companies:
+            # Create company node first
+            try:
+                c = CompanyEntity(
+                    name=company["company_name"],
+                    ticker=company.get("ticker", ""),
+                    market=Market.A if company.get("market") == "A" else Market.US,
+                )
+                self._neo4j.merge_entity(c)
+            except Exception:
+                pass
+            # Create exposure relationship
             rel = Relation(
                 from_name=company["company_name"],
                 to_name=theme_name,
