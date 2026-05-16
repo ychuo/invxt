@@ -118,85 +118,90 @@ class Neo4jClient:
 
     def get_theme_graph(self, theme_name: str) -> dict:
         with self._driver.session() as session:
+            # Return paths individually — avoid nested aggregation
             result = session.run(
                 """
                 MATCH (th:Theme {name: $theme_name})
                 OPTIONAL MATCH (th)-[:REQUIRES]->(t:Technology)
                 OPTIONAL MATCH (t)-[:USES_MATERIAL]->(m:Material)
                 OPTIONAL MATCH (t)-[:USES_EQUIPMENT]->(e:Equipment)
-                OPTIONAL MATCH (m)<-[:SUPPLIES]-(cm:Company)
-                OPTIONAL MATCH (e)<-[:SUPPLIES]-(ce:Company)
                 OPTIONAL MATCH (c_exp:Company)-[r:EXPOSED_TO]->(th)
-                RETURN th, collect(DISTINCT t) AS technologies,
-                       collect(DISTINCT m) AS materials,
-                       collect(DISTINCT e) AS equipments,
-                       collect(DISTINCT cm) AS mat_companies,
-                       collect(DISTINCT ce) AS eq_companies,
-                       collect(DISTINCT {company: c_exp, score: r.score, reasoning: r.reasoning}) AS exposed
+                RETURN th, t, m, e, c_exp, r
                 """,
                 theme_name=theme_name,
             )
-            record = result.single()
-            if not record:
-                return {"nodes": [], "edges": []}
-            return self._format_graph_result(record)
+            return self._format_graph_result(list(result))
 
-    def _format_graph_result(self, record) -> dict:
-        nodes = []
+    def _format_graph_result(self, records) -> dict:
+        node_map: dict[str, dict] = {}  # name -> node
+        edge_set = set()  # (source, target, type)
+
+        def add_node(name, ntype, data=None):
+            if not name:
+                return
+            if name not in node_map:
+                node_map[name] = {"id": name, "type": ntype, "data": data or {}}
+
+        def add_edge(source, target, etype, edata=None):
+            if not source or not target:
+                return
+            key = (source, target, etype)
+            if key not in edge_set:
+                edge_set.add(key)
+                edge = {"source": source, "target": target, "type": etype}
+                if edata:
+                    edge["data"] = edata
+                return edge
+            return None
+
         edges = []
-        seen = set()
-
-        def add_node(n, ntype):
-            if n is None:
-                return
-            name = n.get("name", "")
-            key = (name, ntype)
-            if key in seen or not name:
-                return
-            seen.add(key)
-            nodes.append({"id": name, "type": ntype, "data": dict(n)})
-
-        theme = record.get("th")
         theme_name = ""
-        if theme:
-            add_node(theme, "Theme")
-            theme_name = theme.get("name", "")
 
-        for t in (record.get("technologies") or []):
-            if t:
-                add_node(t, "Technology")
-                if theme_name and t.get("name"):
-                    edges.append({"source": theme_name, "target": t["name"], "type": "REQUIRES"})
+        for record in records:
+            th = record.get("th")
+            t = record.get("t")
+            m = record.get("m")
+            e = record.get("e")
+            c_exp = record.get("c_exp")
+            r = record.get("r")
 
-        for m in (record.get("materials") or []):
-            if m:
-                add_node(m, "Material")
+            if th and th.get("name"):
+                theme_name = th["name"]
+                add_node(theme_name, "Theme", dict(th))
 
-        for e in (record.get("equipments") or []):
-            if e:
-                add_node(e, "Equipment")
+            if t and t.get("name"):
+                t_name = t["name"]
+                add_node(t_name, "Technology", dict(t))
+                edge = add_edge(theme_name, t_name, "REQUIRES")
+                if edge:
+                    edges.append(edge)
 
-        for c in (record.get("mat_companies") or []):
-            if c:
-                add_node(c, "Company")
+            if m and m.get("name"):
+                m_name = m["name"]
+                add_node(m_name, "Material", dict(m))
+                if t and t.get("name"):
+                    edge = add_edge(t["name"], m_name, "USES_MATERIAL")
+                    if edge:
+                        edges.append(edge)
 
-        for c in (record.get("eq_companies") or []):
-            if c:
-                add_node(c, "Company")
+            if e and e.get("name"):
+                e_name = e["name"]
+                add_node(e_name, "Equipment", dict(e))
+                if t and t.get("name"):
+                    edge = add_edge(t["name"], e_name, "USES_EQUIPMENT")
+                    if edge:
+                        edges.append(edge)
 
-        for item in (record.get("exposed") or []):
-            if item and item.get("company"):
-                c = item["company"]
-                name = c.get("name", "")
-                add_node(c, "Company")
-                edges.append({
-                    "source": name,
-                    "target": theme_name,
-                    "type": "EXPOSED_TO",
-                    "data": {"score": item.get("score"), "reasoning": item.get("reasoning")},
-                })
+            if c_exp and c_exp.get("name"):
+                c_name = c_exp["name"]
+                add_node(c_name, "Company", dict(c_exp))
+                if r:
+                    edge = add_edge(c_name, theme_name, "EXPOSED_TO",
+                                    {"score": r.get("score"), "reasoning": r.get("reasoning")})
+                    if edge:
+                        edges.append(edge)
 
-        return {"nodes": nodes, "edges": edges}
+        return {"nodes": list(node_map.values()), "edges": edges}
 
     def search_entities(self, search_query: str, limit: int = 20) -> list[dict]:
         with self._driver.session() as session:
