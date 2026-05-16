@@ -126,7 +126,8 @@ class Neo4jClient:
                 OPTIONAL MATCH (t)-[:USES_MATERIAL]->(m:Material)
                 OPTIONAL MATCH (t)-[:USES_EQUIPMENT]->(e:Equipment)
                 OPTIONAL MATCH (c_exp:Company)-[r:EXPOSED_TO]->(th)
-                RETURN th, t, m, e, c_exp, r
+                OPTIONAL MATCH (t)<-[:SUPPLIES]-(c_sup:Company)
+                RETURN th, t, m, e, c_exp, r, c_sup
                 """,
                 theme_name=theme_name,
             )
@@ -198,6 +199,15 @@ class Neo4jClient:
                 if r:
                     edge = add_edge(c_name, theme_name, "EXPOSED_TO",
                                     {"score": r.get("score"), "reasoning": r.get("reasoning")})
+                    if edge:
+                        edges.append(edge)
+
+            c_sup = record.get("c_sup")
+            if c_sup and c_sup.get("name"):
+                c_name = c_sup["name"]
+                add_node(c_name, "Company", dict(c_sup))
+                if t and t.get("name"):
+                    edge = add_edge(c_name, t["name"], "SUPPLIES")
                     if edge:
                         edges.append(edge)
 

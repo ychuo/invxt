@@ -100,16 +100,34 @@ class AnalysisPipeline:
             await self._emit(state)
             return state
 
-        # Step 3: Company mapping
+        # Step 3: Company mapping (keep per-tech grouping for SUPPLIES edges)
         state.current_step = "company_mapping"
         await self._emit(state)
+        # Map: tech_name -> [companies]
+        tech_companies: dict[str, list[dict]] = {}
         try:
-            state.company_results = await self._mapping_agent.map_all(state.chain_results)
+            for chain in state.chain_results:
+                tech_name = chain.get("direction", "")
+                if tech_name:
+                    companies = await self._mapping_agent.map_companies(chain)
+                    tech_companies[tech_name] = companies
+
+            # Flatten for scoring (deduplicate by ticker)
+            seen = set()
+            all_companies = []
+            for companies in tech_companies.values():
+                for c in companies:
+                    key = c.get("ticker", c.get("company_name", ""))
+                    if key and key not in seen:
+                        seen.add(key)
+                        all_companies.append(c)
+
             if market in ("A", "US"):
-                state.company_results = [
-                    c for c in state.company_results
+                all_companies = [
+                    c for c in all_companies
                     if c.get("market", "").upper() == market
                 ]
+            state.company_results = all_companies
             state.current_step = "company_mapping_completed"
             await self._emit(state)
         except Exception as e:
@@ -176,6 +194,27 @@ class AnalysisPipeline:
                         self._neo4j.create_relation(Relation(
                             from_name=tech_name, to_name=eq_name, type=RelationType.USES_EQUIPMENT,
                         ))
+
+            # Create Company SUPPLIES Technology edges
+            from backend.kg.schemas import CompanyEntity, Market as MarketEnum
+            for tech_name, companies in tech_companies.items():
+                for company in companies:
+                    try:
+                        c = CompanyEntity(
+                            name=company["company_name"],
+                            ticker=company.get("ticker", ""),
+                            market=MarketEnum.A if company.get("market") == "A" else MarketEnum.US,
+                        )
+                        self._neo4j.merge_entity(c)
+                        self._neo4j.create_relation(Relation(
+                            from_name=company["company_name"],
+                            to_name=tech_name,
+                            type=RelationType.SUPPLIES,
+                            properties={"relevance": company.get("relevance", "")},
+                        ))
+                    except Exception:
+                        pass
+
         except Exception:
             pass
 
