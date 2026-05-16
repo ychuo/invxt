@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { submitAnalysis, createAnalysisSocket, getGraph } from "@/lib/api";
-import type { AnalysisState } from "@/types";
-import type { GraphData } from "@/types";
+import { submitAnalysis, getAnalysis, getAnalysisByTopic, getGraph } from "@/lib/api";
+import type { AnalysisState, GraphData } from "@/types";
 import ThemeSummary from "@/components/ThemeSummary";
 import IndustryChainGraph from "@/components/IndustryChainGraph";
 import CompanyTable from "@/components/CompanyTable";
@@ -20,55 +19,81 @@ export default function AnalysisPage() {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const socketRef = useRef<WebSocket | null>(null);
+  const [taskId, setTaskId] = useState<string | null>(null);
 
+  // Step 1: Check cache or submit new analysis
   useEffect(() => {
     if (!topic) return;
 
     let mounted = true;
 
-    async function run() {
-      setLoading(true);
+    async function load() {
       try {
-        const { task_id } = await submitAnalysis(topic, market);
-
-        const ws = createAnalysisSocket(task_id);
-        socketRef.current = ws;
-
-        ws.onmessage = (event) => {
-          const msg = JSON.parse(event.data);
-          if (!mounted) return;
-
-          if (msg.type === "progress") {
-            setState(msg.data as AnalysisState);
-          } else if (msg.type === "done") {
-            setLoading(false);
-            ws.close();
-          } else if (msg.type === "error") {
-            setError(msg.message);
-            setLoading(false);
-            ws.close();
-          }
-        };
-
-        ws.onerror = () => {
-          if (mounted) setError("WebSocket connection failed");
+        // Check cache first
+        const cached = await getAnalysisByTopic(topic, market);
+        if (cached && mounted) {
+          setState(cached);
           setLoading(false);
-        };
+          return;
+        }
+
+        // Not cached, submit new analysis
+        const { task_id } = await submitAnalysis(topic, market);
+        if (mounted) setTaskId(task_id);
       } catch (err) {
-        if (mounted) setError(String(err));
-        setLoading(false);
+        if (mounted) {
+          setError(String(err));
+          setLoading(false);
+        }
       }
     }
 
-    run();
+    load();
+
+    return () => { mounted = false; };
+  }, [topic, market]);
+
+  // Step 2: Poll for results
+  useEffect(() => {
+    if (!taskId) return;
+
+    let mounted = true;
+    let timer: ReturnType<typeof setInterval>;
+
+    async function poll() {
+      try {
+        const result = await getAnalysis(taskId);
+        if (!mounted) return;
+
+        setState(result);
+
+        if (result.status === "completed" || result.status === "failed") {
+          setLoading(false);
+          if (result.status === "failed") {
+            setError(result.error || "Analysis failed");
+          }
+          clearInterval(timer);
+        }
+      } catch (err) {
+        if (mounted) {
+          setError(String(err));
+          setLoading(false);
+          clearInterval(timer);
+        }
+      }
+    }
+
+    // Poll immediately, then every 2 seconds
+    poll();
+    timer = setInterval(poll, 2000);
 
     return () => {
       mounted = false;
-      socketRef.current?.close();
+      clearInterval(timer);
     };
-  }, [topic, market]);
+  }, [taskId]);
 
+  // Step 3: Fetch graph data when theme is ready
   useEffect(() => {
     if (state?.theme?.theme_name) {
       getGraph(state.theme.theme_name)
@@ -98,13 +123,17 @@ export default function AnalysisPage() {
         </div>
       )}
 
+      {loading && state && (
+        <ProgressStepper currentStep={state.current_step} />
+      )}
+
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6">
           {error}
         </div>
       )}
 
-      {state && (
+      {state && state.status === "completed" && (
         <div>
           <ProgressStepper currentStep={state.current_step} />
 

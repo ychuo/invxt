@@ -21,6 +21,17 @@ export async function getAnalysis(taskId: string): Promise<AnalysisState> {
   return res.json();
 }
 
+export async function getAnalysisByTopic(
+  topic: string,
+  market: string
+): Promise<AnalysisState | null> {
+  const res = await fetch(
+    `${API_BASE}/theme/by-name/${encodeURIComponent(topic)}?market=${market}`
+  );
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function getGraph(themeName: string): Promise<GraphData> {
   const res = await fetch(`${API_BASE}/graph/${encodeURIComponent(themeName)}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -33,8 +44,4 @@ export async function searchEntities(
   const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
-}
-
-export function createAnalysisSocket(taskId: string): WebSocket {
-  return new WebSocket(`ws://localhost:8000/ws/analyze/${taskId}`);
 }
