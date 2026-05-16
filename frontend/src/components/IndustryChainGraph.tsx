@@ -120,12 +120,14 @@ export default function IndustryChainGraph({ data }: Props) {
     return ()=>el.removeEventListener("wheel",onWheel);
   }, []);
 
-  // Touch pinch zoom
+  // Touch pinch zoom — use ref for current zoom to avoid stale closure
   const pinchRef = useRef({ dist: 0, zoom: 1 });
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+
   useEffect(() => {
     const el=containerRef.current; if(!el)return;
-    const zRef = { current: 1 };
-    const onTS=(e:TouchEvent)=>{if(e.touches.length===2){pinchRef.current.dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);pinchRef.current.zoom=zoom;}};
+    const onTS=(e:TouchEvent)=>{if(e.touches.length===2){pinchRef.current.dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);pinchRef.current.zoom=zoomRef.current;}};
     const onTM=(e:TouchEvent)=>{if(e.touches.length!==2||pinchRef.current.dist===0)return;e.preventDefault();const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);setZoom(Math.min(5,Math.max(0.1,pinchRef.current.zoom*(d/pinchRef.current.dist))));};
     const onTE=()=>{pinchRef.current.dist=0;};
     el.addEventListener("touchstart",onTS,{passive:true});
