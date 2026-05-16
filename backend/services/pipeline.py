@@ -82,7 +82,7 @@ class AnalysisPipeline:
             await self._emit(state)
         except Exception as e:
             state.status = StepStatus.FAILED
-            state.error = f"Theme analysis failed: {e}"
+            state.error = f"Theme analysis failed: {type(e).__name__}: {e}"
             await self._emit(state)
             return state
 
@@ -96,7 +96,7 @@ class AnalysisPipeline:
             await self._emit(state)
         except Exception as e:
             state.status = StepStatus.FAILED
-            state.error = f"Chain reasoning failed: {e}"
+            state.error = f"Chain reasoning failed: {type(e).__name__}: {e}"
             await self._emit(state)
             return state
 
@@ -132,7 +132,7 @@ class AnalysisPipeline:
             await self._emit(state)
         except Exception as e:
             state.status = StepStatus.FAILED
-            state.error = f"Company mapping failed: {e}"
+            state.error = f"Company mapping failed: {type(e).__name__}: {e}"
             await self._emit(state)
             return state
 
@@ -150,7 +150,7 @@ class AnalysisPipeline:
             await self._emit(state)
         except Exception as e:
             state.status = StepStatus.FAILED
-            state.error = f"Scoring failed: {e}"
+            state.error = f"Scoring failed: {type(e).__name__}: {e}"
             await self._emit(state)
             return state
 
