@@ -48,10 +48,17 @@ function buildAdjacency(data: GraphData): Map<string, Set<string>> {
   return adj;
 }
 
-function getNeighborhood(nodeId: string, adj: Map<string, Set<string>>): Set<string> {
+// Smart highlight: 1-hop + expand through tech nodes only (not Theme, which connects everything)
+function getNeighborhood(nodeId: string, adj: Map<string, Set<string>>, nodeTypes: Map<string, string>): Set<string> {
   const nb = new Set<string>();
   nb.add(nodeId);
-  for (const n of adj.get(nodeId) || []) nb.add(n);
+  for (const n1 of adj.get(nodeId) || []) {
+    nb.add(n1);
+    // Only traverse deeper if n1 is a Technology node (not Theme which connects to all companies)
+    if (nodeTypes.get(n1) === "Technology") {
+      for (const n2 of adj.get(n1) || []) nb.add(n2);
+    }
+  }
   return nb;
 }
 
@@ -84,7 +91,8 @@ export default function IndustryChainGraph({ data }: Props) {
   }, [fullscreen]);
 
   const adjacency = useMemo(() => (data ? buildAdjacency(data) : new Map()), [data]);
-  const highlightSet = useMemo(() => highlightNode ? getNeighborhood(highlightNode, adjacency) : null, [highlightNode, adjacency]);
+  const nodeTypes = useMemo(() => { const m = new Map<string, string>(); if (data) for (const n of data.nodes) m.set(n.id, n.type); return m; }, [data]);
+  const highlightSet = useMemo(() => highlightNode ? getNeighborhood(highlightNode, adjacency, nodeTypes) : null, [highlightNode, adjacency, nodeTypes]);
 
   const visibleIds = useMemo(() => {
     const s = new Set<string>();
@@ -189,7 +197,7 @@ export default function IndustryChainGraph({ data }: Props) {
   // Wheel zoom
   useEffect(() => {
     const el = containerRef.current; if (!el) return;
-    const onWheel = (e: WheelEvent) => { e.preventDefault(); const d = e.deltaY > 0 ? 0.9 : 1.1; setZoom((z) => Math.min(5, Math.max(0.15, z * d))); };
+    const onWheel = (e: WheelEvent) => { e.preventDefault(); const factor = e.ctrlKey ? Math.exp(-e.deltaY / 100) : (e.deltaY > 0 ? 0.9 : 1.1); setZoom((z) => Math.min(5, Math.max(0.15, z * factor))); };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
@@ -226,6 +234,7 @@ export default function IndustryChainGraph({ data }: Props) {
           <div
             ref={containerRef}
             className="w-full h-full overflow-hidden cursor-grab active:cursor-grabbing select-none"
+            style={{ touchAction: "none" }}
             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
           >
             <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: "0 0" }}>
