@@ -20,26 +20,22 @@ export default function AnalysisPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [taskId, setTaskId] = useState<string | null>(null);
-  const startedRef = useRef(false);
+  const initRef = useRef<Promise<void> | null>(null);
 
   // Step 1: Check cache or submit new analysis
   useEffect(() => {
-    if (!topic || startedRef.current) return;
-    startedRef.current = true;
+    if (!topic) return;
 
     let mounted = true;
 
-    async function load() {
+    const doLoad = async () => {
       try {
-        // Check cache first
         const cached = await getAnalysisByTopic(topic, market);
         if (cached && mounted) {
           setState(cached);
           setLoading(false);
           return;
         }
-
-        // Not cached, submit new analysis
         const { task_id } = await submitAnalysis(topic, market);
         if (mounted) setTaskId(task_id);
       } catch (err) {
@@ -48,9 +44,14 @@ export default function AnalysisPage() {
           setLoading(false);
         }
       }
-    }
+    };
 
-    load();
+    // Dedup: if a load is already in flight from StrictMode double-mount, chain onto it
+    if (initRef.current) {
+      initRef.current.then(() => { if (mounted) doLoad(); });
+    } else {
+      initRef.current = doLoad().then(() => { initRef.current = null; });
+    }
 
     return () => { mounted = false; };
   }, [topic, market]);
