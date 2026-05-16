@@ -13,6 +13,7 @@ import ReactFlow, {
   ReactFlowProvider,
 } from "reactflow";
 import "reactflow/dist/style.css";
+import dagre from "dagre";
 import type { GraphData } from "@/types";
 
 const NODE_COLORS: Record<string, string> = {
@@ -34,10 +35,10 @@ const NODE_SIZES: Record<string, { w: number; h: number; fs: number }> = {
 };
 
 const EDGE_LABELS: Record<string, string> = {
-  REQUIRES: "核心技术",
-  USES_MATERIAL: "关键材料",
-  USES_EQUIPMENT: "关键设备",
-  EXPOSED_TO: "受益公司",
+  REQUIRES: "",
+  USES_MATERIAL: "材料",
+  USES_EQUIPMENT: "设备",
+  EXPOSED_TO: "",
 };
 
 const HIGHLIGHT_COLORS: Record<string, string> = {
@@ -51,273 +52,210 @@ const NEUTRAL_EDGE = "#cbd5e1";
 
 const LEGEND_ITEMS = [
   { type: "Theme", label: "主题" },
-  { type: "Technology", label: "技术方向" },
+  { type: "Technology", label: "技术方向 ▸ 点击展开" },
   { type: "Material", label: "关键材料" },
   { type: "Equipment", label: "关键设备" },
   { type: "Company", label: "相关公司" },
 ];
 
-// BFS from root(s) to compute shortest-path tree (parent pointers)
-// Returns: Map<nodeId, parentNodeId> where parent is one step closer to root
-function buildParentMap(
-  nodes: { id: string; type: string }[],
-  adjacency: Map<string, Set<string>>
-): Map<string, string | null> {
-  const parents = new Map<string, string | null>();
-  const queue: string[] = [];
+// ---- helpers ----
 
-  // Roots = Theme nodes
+function buildChildMap(data: GraphData): Map<string, { id: string; type: string }[]> {
+  const m = new Map<string, { id: string; type: string }[]>();
+  // Tech → Material/Equipment (from USES_MATERIAL / USES_EQUIPMENT edges)
+  for (const e of data.edges) {
+    if (e.type === "USES_MATERIAL" || e.type === "USES_EQUIPMENT") {
+      if (!m.has(e.source)) m.set(e.source, []);
+      const childType = e.type === "USES_MATERIAL" ? "Material" : "Equipment";
+      m.get(e.source)!.push({ id: e.target, type: childType });
+    }
+  }
+  return m;
+}
+
+function getThemeId(data: GraphData): string {
+  const theme = data.nodes.find((n) => n.type === "Theme");
+  return theme?.id || "";
+}
+
+// ---- tree layout (dagre, top-down) ----
+
+function layoutTree(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
+  const g = new dagre.graphlib.Graph();
+  g.setDefaultEdgeLabel(() => ({}));
+  g.setGraph({ rankdir: "TB", nodesep: 70, ranksep: 100, marginx: 40, marginy: 40 });
+
   for (const n of nodes) {
-    if (n.type === "Theme") {
-      parents.set(n.id, null);
-      queue.push(n.id);
-    }
+    const size = NODE_SIZES[n.type || "Company"] || NODE_SIZES.Company;
+    g.setNode(n.id, { width: size.w, height: size.h });
   }
-
-  // BFS from roots outward
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    const neighbors = adjacency.get(current);
-    if (neighbors) {
-      for (const neighbor of neighbors) {
-        if (!parents.has(neighbor)) {
-          parents.set(neighbor, current);
-          queue.push(neighbor);
-        }
-      }
-    }
-  }
-  return parents;
-}
-
-// Trace from nodeId up to root via parent pointers
-function getPathToRoot(
-  nodeId: string,
-  parents: Map<string, string | null>
-): Set<string> {
-  const path = new Set<string>();
-  let current: string | null | undefined = nodeId;
-  while (current) {
-    path.add(current);
-    current = parents.get(current);
-    if (current === null) break; // reached root
-  }
-  return path;
-}
-
-const LEVEL_ORDER: Record<string, number> = {
-  Theme: 0,
-  Technology: 1,
-  Material: 2,
-  Equipment: 2,
-  Product: 2,
-  Company: 3,
-};
-
-function layoutRadial(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
-  // BFS from Theme roots to assign levels
-  const adj = new Map<string, Set<string>>();
   for (const e of edges) {
-    const s = e.data?.originalType === "EXPOSED_TO" ? e.target : e.source;
-    const t = e.data?.originalType === "EXPOSED_TO" ? e.source : e.target;
-    if (!adj.has(s)) adj.set(s, new Set());
-    if (!adj.has(t)) adj.set(t, new Set());
-    adj.get(s)!.add(t);
-    adj.get(t)!.add(s);
+    g.setEdge(e.source, e.target);
   }
 
-  const levels = new Map<string, number>();
-  const queue: string[] = [];
+  dagre.layout(g);
 
-  // Find theme roots
-  for (const n of nodes) {
-    if (n.type === "Theme") {
-      levels.set(n.id, 0);
-      queue.push(n.id);
-    }
-  }
-
-  // BFS
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    const currentLevel = levels.get(current)!;
-    const neighbors = adj.get(current);
-    if (neighbors) {
-      for (const neighbor of neighbors) {
-        if (!levels.has(neighbor)) {
-          levels.set(neighbor, currentLevel + 1);
-          queue.push(neighbor);
-        }
-      }
-    }
-  }
-
-  // Group nodes by level
-  const byLevel = new Map<number, Node[]>();
-  for (const n of nodes) {
-    const level = levels.get(n.id) ?? LEVEL_ORDER[n.type || "Company"] ?? 2;
-    if (!byLevel.has(level)) byLevel.set(level, []);
-    byLevel.get(level)!.push(n);
-  }
-
-  const maxLevel = Math.max(...byLevel.keys());
-  const ringGap = 220;
-  const centerGap = 80;
-
-  const laidOut = nodes.map((n) => {
-    const level = levels.get(n.id) ?? LEVEL_ORDER[n.type || "Company"] ?? 2;
-    const ring = byLevel.get(level)!;
-    const idx = ring.indexOf(n);
-    const total = ring.length;
-    const radius = level === 0 ? 0 : centerGap + (level - 0.5) * ringGap;
-    const angle = total <= 1 ? 0 : (idx / total) * Math.PI * 2 - Math.PI / 2;
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle) * radius;
-    return { ...n, position: { x, y } };
-  });
-
-  return { nodes: laidOut, edges };
+  return {
+    nodes: nodes.map((n) => {
+      const pos = g.node(n.id);
+      if (!pos) return n;
+      const size = NODE_SIZES[n.type || "Company"] || NODE_SIZES.Company;
+      return { ...n, position: { x: pos.x - size.w / 2, y: pos.y - size.h / 2 } };
+    }),
+    edges,
+  };
 }
+
+// ---- canvas ----
 
 interface CanvasProps {
   data: GraphData | null;
   showLabels: boolean;
-  highlightNode: string | null;
-  onNodeClick: (id: string | null) => void;
+  expandedTechs: Set<string>;
+  showCompanies: boolean;
+  onToggleTech: (techId: string) => void;
 }
 
-function GraphCanvas({ data, showLabels, highlightNode, onNodeClick }: CanvasProps) {
+function GraphCanvas({ data, showLabels, expandedTechs, showCompanies, onToggleTech }: CanvasProps) {
   const initialLoad = useRef(true);
   const { fitView } = useReactFlow();
+  const childMap = useMemo(() => (data ? buildChildMap(data) : new Map()), [data]);
+  const themeId = useMemo(() => (data ? getThemeId(data) : ""), [data]);
 
-  // Build adjacency and parent map for path-to-root highlighting
-  const { adjacency, parents } = useMemo(() => {
-    const adj = new Map<string, Set<string>>();
-    if (!data) return { adjacency: adj, parents: new Map() };
-    for (const e of data.edges) {
-      if (!adj.has(e.source)) adj.set(e.source, new Set());
-      if (!adj.has(e.target)) adj.set(e.target, new Set());
-      adj.get(e.source)!.add(e.target);
-      adj.get(e.target)!.add(e.source);
-    }
-    const p = buildParentMap(data.nodes, adj);
-    return { adjacency: adj, parents: p };
+  // Which company nodes exist (connected via EXPOSED_TO)
+  const companyIds = useMemo(() => {
+    if (!data) return new Set<string>();
+    return new Set(
+      data.edges.filter((e) => e.type === "EXPOSED_TO").map((e) => e.source)
+    );
   }, [data]);
 
-  // Path from highlighted node to root
-  const highlightPath = useMemo(() => {
-    if (!highlightNode) return null;
-    return getPathToRoot(highlightNode, parents);
-  }, [highlightNode, parents]);
+  // Compute visible node ids
+  const visibleIds = useMemo(() => {
+    const s = new Set<string>();
+    if (!data) return s;
+    s.add(themeId);
+    for (const n of data.nodes) {
+      if (n.type === "Technology") s.add(n.id);
+    }
+    for (const techId of expandedTechs) {
+      for (const child of childMap.get(techId) || []) {
+        s.add(child.id);
+      }
+    }
+    // Show all companies as one block at the bottom if enabled
+    if (showCompanies) {
+      for (const cid of companyIds) s.add(cid);
+    }
+    return s;
+  }, [data, themeId, expandedTechs, childMap, showCompanies, companyIds]);
 
-  const { nodes: rawNodes, edges: rawEdges } = useMemo(() => {
-    if (!data) return { nodes: [] as Node[], edges: [] as Edge[] };
+  // Compute visible edges
+  const visibleEdges = useMemo(() => {
+    if (!data) return new Set<number>();
+    const s = new Set<number>();
+    data.edges.forEach((e, i) => {
+      if (!visibleIds.has(e.source) || !visibleIds.has(e.target)) return;
+      s.add(i);
+    });
+    return s;
+  }, [data, visibleIds]);
 
-    const ns: Node[] = data.nodes.map((n) => {
+  // Build ReactFlow nodes + edges from visible set
+  const { rawNodes, rawEdges, edgeIndex } = useMemo(() => {
+    if (!data) return { rawNodes: [] as Node[], rawEdges: [] as Edge[], edgeIndex: new Map<number, string>() };
+
+    const ns: Node[] = [];
+    const es: Edge[] = [];
+    const idx = new Map<number, string>();
+
+    for (const n of data.nodes) {
+      if (!visibleIds.has(n.id)) continue;
       const size = NODE_SIZES[n.type] || NODE_SIZES.Company;
-      const onPath = highlightPath && highlightPath.has(n.id);
-      const isClicked = n.id === highlightNode;
-      return {
+      const isExpandedTech = n.type === "Technology" && expandedTechs.has(n.id);
+      ns.push({
         id: n.id,
         type: "default",
-        data: { label: n.id },
+        data: {
+          label: n.type === "Technology"
+            ? (isExpandedTech ? "▾ " : "▸ ") + n.id
+            : n.id,
+        },
         position: { x: 0, y: 0 },
         style: {
           background: NODE_COLORS[n.type] || "#ddd",
           color: "#fff",
-          border: n.type === "Theme"
-            ? "2px solid #c0392b"
-            : isClicked
-            ? "2px solid #333"
-            : "none",
+          border: n.type === "Theme" ? "2px solid #c0392b" : "none",
           borderRadius: n.type === "Theme" ? 8 : 5,
           padding: n.type === "Theme" ? "10px 20px" : "6px 14px",
           fontWeight: n.type === "Theme" ? 700 : 600,
           fontSize: size.fs,
           width: size.w,
           textAlign: "center" as const,
-          opacity: !highlightPath || onPath ? 1 : 0.15,
-          cursor: "pointer",
+          cursor: n.type === "Technology" ? "pointer" : "default",
+          opacity: 1,
         },
-      };
-    });
+      });
+    }
 
-    return { nodes: ns, edges: [] };
-  }, [data, highlightPath, highlightNode]);
-
-  const allEdges: Edge[] = useMemo(() => {
-    if (!data) return [];
-    return data.edges.map((e, i) => {
+    data.edges.forEach((e, i) => {
+      if (!visibleEdges.has(i)) return;
       const eType = e.type || "";
-      const onPath =
-        highlightPath &&
-        highlightPath.has(e.source) &&
-        highlightPath.has(e.target);
-      const hlColor = HIGHLIGHT_COLORS[eType] || NEUTRAL_EDGE;
+      const isCompanyEdge = eType === "EXPOSED_TO";
+      // For layout, company edges go Theme→Company (not Company→Theme)
+      const src = isCompanyEdge ? e.target : e.source;
+      const tgt = isCompanyEdge ? e.source : e.target;
 
-      return {
+      es.push({
         id: `e-${i}`,
-        source: e.source,
-        target: e.target,
+        source: src,
+        target: tgt,
         data: { originalType: eType },
-        label: showLabels ? (EDGE_LABELS[eType] || eType) : "",
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: 16, height: 16,
-          color: onPath ? hlColor : NEUTRAL_EDGE,
-        },
-        style: {
-          stroke: onPath ? hlColor : NEUTRAL_EDGE,
-          strokeWidth: onPath ? 2.5 : 1.2,
-          opacity: !highlightPath || onPath ? 1 : 0.06,
-        },
-        labelStyle: {
-          fontSize: 9,
-          fill: onPath ? hlColor : "#94a3b8",
-          fontWeight: 400,
-        },
-        labelBgStyle: { fill: "rgba(255,255,255,0.85)" },
-        labelBgPadding: [4, 2] as [number, number],
+        label: showLabels ? (EDGE_LABELS[eType] || "") : "",
+        markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: NEUTRAL_EDGE },
+        style: { stroke: NEUTRAL_EDGE, strokeWidth: 1.3 },
+        labelStyle: { fontSize: 9, fill: "#94a3b8" },
+        labelBgStyle: { fill: "rgba(255,255,255,0.8)" },
+        labelBgPadding: [3, 2] as [number, number],
         labelBgBorderRadius: 3,
-      };
+      });
+      idx.set(i, `e-${i}`);
     });
-  }, [data, showLabels, highlightPath]);
 
-  const layouted = useMemo(() => layoutRadial(rawNodes, allEdges), [rawNodes, allEdges]);
+    return { rawNodes: ns, rawEdges: es, edgeIndex: idx };
+  }, [data, visibleIds, visibleEdges, showLabels, expandedTechs]);
+
+  const layouted = useMemo(() => layoutTree(rawNodes, rawEdges), [rawNodes, rawEdges]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layouted.edges);
 
-  // Sync nodes/edges on layout change
   useEffect(() => {
     setNodes(layouted.nodes);
     setEdges(layouted.edges);
   }, [layouted.nodes, layouted.edges, setNodes, setEdges]);
 
-  // fitView only on initial data load, not on highlight changes
   useEffect(() => {
     if (initialLoad.current && layouted.nodes.length > 0) {
       initialLoad.current = false;
-      const timer = setTimeout(() => fitView({ padding: 0.15, duration: 300 }), 200);
-      return () => clearTimeout(timer);
+      const t = setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 200);
+      return () => clearTimeout(t);
     }
   }, [layouted.nodes.length, fitView]);
 
-  // Reset initialLoad when data identity changes (new topic)
   useEffect(() => {
     initialLoad.current = true;
   }, [data]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      onNodeClick(highlightNode === node.id ? null : node.id);
+      const nType = data?.nodes.find((n) => n.id === node.id)?.type;
+      if (nType === "Technology") {
+        onToggleTech(node.id);
+      }
     },
-    [highlightNode, onNodeClick]
+    [data, onToggleTech]
   );
-
-  const handlePaneClick = useCallback(() => {
-    onNodeClick(null);
-  }, [onNodeClick]);
 
   return (
     <ReactFlow
@@ -326,12 +264,11 @@ function GraphCanvas({ data, showLabels, highlightNode, onNodeClick }: CanvasPro
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onNodeClick={handleNodeClick}
-      onPaneClick={handlePaneClick}
       fitView
       nodesDraggable={false}
       nodesConnectable={false}
-      elementsSelectable={true}
-      minZoom={0.05}
+      elementsSelectable={false}
+      minZoom={0.1}
       maxZoom={3}
     >
       <Background color="#f1f5f9" gap={20} />
@@ -340,16 +277,24 @@ function GraphCanvas({ data, showLabels, highlightNode, onNodeClick }: CanvasPro
   );
 }
 
+// ---- main component ----
+
 export default function IndustryChainGraph({ data }: Props) {
   const [fullscreen, setFullscreen] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
-  const [highlightNode, setHighlightNode] = useState<string | null>(null);
+  const [expandedTechs, setExpandedTechs] = useState<Set<string>>(new Set());
+  const [showCompanies, setShowCompanies] = useState(false);
+
+  const toggleTech = useCallback((techId: string) => {
+    setExpandedTechs((prev) => {
+      const next = new Set(prev);
+      if (next.has(techId)) next.delete(techId);
+      else next.add(techId);
+      return next;
+    });
+  }, []);
 
   const toggleFullscreen = useCallback(() => setFullscreen((f) => !f), []);
-
-  const handleNodeClick = useCallback((id: string | null) => {
-    setHighlightNode(id);
-  }, []);
 
   useEffect(() => {
     if (!fullscreen) return;
@@ -359,6 +304,20 @@ export default function IndustryChainGraph({ data }: Props) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [fullscreen]);
+
+  const nodeCount = useMemo(() => {
+    if (!data) return 0;
+    let count = 1 + data.nodes.filter((n) => n.type === "Technology").length;
+    for (const techId of expandedTechs) {
+      count += data.edges.filter(
+        (e) => e.source === techId && (e.type === "USES_MATERIAL" || e.type === "USES_EQUIPMENT")
+      ).length;
+    }
+    if (showCompanies) {
+      count += data.edges.filter((e) => e.type === "EXPOSED_TO").length;
+    }
+    return count;
+  }, [data, expandedTechs, showCompanies]);
 
   if (!data || data.nodes.length === 0) {
     return (
@@ -379,29 +338,36 @@ export default function IndustryChainGraph({ data }: Props) {
           <GraphCanvas
             data={data}
             showLabels={showLabels}
-            highlightNode={highlightNode}
-            onNodeClick={handleNodeClick}
+            expandedTechs={expandedTechs}
+            showCompanies={showCompanies}
+            onToggleTech={toggleTech}
           />
         </ReactFlowProvider>
 
-        {/* Toolbar — top-left */}
-        <div className="absolute top-2 left-2 z-10 flex gap-1.5">
+        {/* Toolbar */}
+        <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap">
           <button
             onClick={() => setShowLabels((s) => !s)}
             className={`bg-white/95 border rounded px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors ${
-              showLabels
-                ? "text-blue-600 border-blue-400 bg-blue-50"
-                : "text-gray-500 hover:text-gray-700"
+              showLabels ? "text-blue-600 border-blue-400 bg-blue-50" : "text-gray-500 hover:text-gray-700"
             }`}
           >
             {showLabels ? "标签 ON" : "标签"}
           </button>
-          {highlightNode && (
+          <button
+            onClick={() => setShowCompanies((s) => !s)}
+            className={`bg-white/95 border rounded px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors ${
+              showCompanies ? "text-green-600 border-green-400 bg-green-50" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {showCompanies ? "公司 ON" : "公司"}
+          </button>
+          {expandedTechs.size > 0 && (
             <button
-              onClick={() => setHighlightNode(null)}
+              onClick={() => setExpandedTechs(new Set())}
               className="bg-white/95 border border-orange-300 rounded px-2.5 py-1.5 text-xs font-medium text-orange-600 shadow-sm"
             >
-              清除高亮
+              收起全部
             </button>
           )}
           {!fullscreen && (
@@ -414,7 +380,7 @@ export default function IndustryChainGraph({ data }: Props) {
           )}
         </div>
 
-        {/* Legend — bottom-left */}
+        {/* Legend */}
         <div className="absolute bottom-2 left-2 z-10 bg-white/90 border rounded-lg px-3 py-2 shadow-sm">
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
             {LEGEND_ITEMS.map((item) => (
@@ -429,20 +395,19 @@ export default function IndustryChainGraph({ data }: Props) {
           </div>
         </div>
 
-        {/* Fullscreen-only UI */}
+        {/* Node count */}
+        <div className="absolute top-2 right-2 z-10 bg-white/80 rounded px-2 py-1 text-xs text-gray-400">
+          {nodeCount} 可见 / {data.nodes.length} 总计
+        </div>
+
+        {/* Fullscreen exit */}
         {fullscreen && (
-          <>
-            <button
-              onClick={toggleFullscreen}
-              className="absolute top-2 right-2 z-10 bg-white border rounded-lg px-3 py-2 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50"
-            >
-              ✕ 退出全屏 (Esc)
-            </button>
-            <div className="absolute bottom-2 right-2 z-10 bg-white/80 rounded px-2 py-1 text-xs text-gray-400">
-              {data.nodes.length} 节点 · {data.edges.length} 连线
-              {highlightNode && ` · 已高亮: ${highlightNode}`}
-            </div>
-          </>
+          <button
+            onClick={toggleFullscreen}
+            className="absolute top-3 right-3 z-10 bg-white border rounded-lg px-3 py-2 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50"
+          >
+            ✕ 退出全屏 (Esc)
+          </button>
         )}
       </div>
     </>
