@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+.next/
+.superpowers/
+neo4j_data/
+pg_data/
