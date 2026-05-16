@@ -33,11 +33,13 @@ async def _run_and_cache(topic: str, market: str, task_id: str):
         3600,
         json.dumps(state.to_dict(), ensure_ascii=False),
     )
-    await redis.setex(
-        f"analysis:topic:{topic}:{market}",
-        86400,
-        json.dumps(state.to_dict(), ensure_ascii=False),
-    )
+    # Only cache by topic name on success — don't poison cache with failures
+    if state.status == StepStatus.COMPLETED:
+        await redis.setex(
+            f"analysis:topic:{topic}:{market}",
+            86400,
+            json.dumps(state.to_dict(), ensure_ascii=False),
+        )
     await redis.close()
 
 
