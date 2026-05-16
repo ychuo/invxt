@@ -7,3 +7,4 @@ node_modules/
 .superpowers/
 neo4j_data/
 pg_data/
+.playwright-mcp
