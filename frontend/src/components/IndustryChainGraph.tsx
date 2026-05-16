@@ -143,9 +143,9 @@ export default function IndustryChainGraph({ data }: Props) {
       if (!visibleIds.has(n.id)) continue;
       let col: number;
       if (n.type === "Theme") col = 0;
-      else if (n.type === "Technology") col = 1;
-      else if (n.type === "Material" || n.type === "Equipment" || n.type === "Product") col = 2;
-      else col = 3; // Company
+      else if (n.type === "Company") col = 1;
+      else if (n.type === "Technology") col = 2;
+      else col = 3; // Material / Equipment
 
       nodeIndex[n.id] = nodes.length;
       nodeCol[n.id] = col;
@@ -155,13 +155,16 @@ export default function IndustryChainGraph({ data }: Props) {
     const links: SankeyDataLink[] = [];
     for (const e of data.edges) {
       if (!visibleIds.has(e.source) || !visibleIds.has(e.target)) continue;
-      const srcCol = nodeCol[e.source] ?? -1;
-      const tgtCol = nodeCol[e.target] ?? -1;
-      // Only include edges going forward (left to right)
+      const isCompanyEdge = e.type === "EXPOSED_TO";
+      // EXPOSED_TO goes Company→Theme, swap to Theme→Company for left→right flow
+      const src = isCompanyEdge ? e.target : e.source;
+      const tgt = isCompanyEdge ? e.source : e.target;
+      const srcCol = nodeCol[src] ?? -1;
+      const tgtCol = nodeCol[tgt] ?? -1;
       if (srcCol >= tgtCol) continue;
       links.push({
-        source: e.source,
-        target: e.target,
+        source: src,
+        target: tgt,
         value: 1,
         edgeType: e.type || "",
       });
