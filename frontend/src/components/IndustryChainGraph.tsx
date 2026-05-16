@@ -108,19 +108,61 @@ function layoutTree(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[
 
 // ---- canvas ----
 
+// Build parent map for path-to-root (BFS from Theme)
+function buildParentMap(graphData: GraphData): Map<string, string | null> {
+  const adj = new Map<string, Set<string>>();
+  for (const e of graphData.edges) {
+    if (!adj.has(e.source)) adj.set(e.source, new Set());
+    if (!adj.has(e.target)) adj.set(e.target, new Set());
+    adj.get(e.source)!.add(e.target);
+    adj.get(e.target)!.add(e.source);
+  }
+  const parents = new Map<string, string | null>();
+  const queue: string[] = [];
+  for (const n of graphData.nodes) {
+    if (n.type === "Theme") { parents.set(n.id, null); queue.push(n.id); }
+  }
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    for (const nb of adj.get(cur) || []) {
+      if (!parents.has(nb)) { parents.set(nb, cur); queue.push(nb); }
+    }
+  }
+  return parents;
+}
+
+function getPathToRoot(nodeId: string, parents: Map<string, string | null>): Set<string> {
+  const path = new Set<string>();
+  let cur: string | null | undefined = nodeId;
+  while (cur) {
+    path.add(cur);
+    cur = parents.get(cur);
+    if (cur === null) break;
+  }
+  return path;
+}
+
 interface CanvasProps {
   data: GraphData | null;
   showLabels: boolean;
   expandedTechs: Set<string>;
   showCompanies: boolean;
+  highlightNode: string | null;
   onToggleTech: (techId: string) => void;
+  onHighlight: (nodeId: string | null) => void;
 }
 
-function GraphCanvas({ data, showLabels, expandedTechs, showCompanies, onToggleTech }: CanvasProps) {
-  const initialLoad = useRef(true);
-  const { fitView } = useReactFlow();
+function GraphCanvas({ data, showLabels, expandedTechs, showCompanies, highlightNode, onToggleTech, onHighlight }: CanvasProps) {
+  const layoutChanged = useRef(false);
+  const { fitView, setCenter } = useReactFlow();
   const childMap = useMemo(() => (data ? buildChildMap(data) : new Map()), [data]);
   const themeId = useMemo(() => (data ? getThemeId(data) : ""), [data]);
+  const parents = useMemo(() => (data ? buildParentMap(data) : new Map()), [data]);
+  const highlightPath = useMemo(
+    () => highlightNode ? getPathToRoot(highlightNode, parents) : null,
+    [highlightNode, parents]
+  );
+  const lastExpandedRef = useRef<string | null>(null);
 
   // Which company nodes exist (connected via EXPOSED_TO)
   const companyIds = useMemo(() => {
@@ -173,6 +215,8 @@ function GraphCanvas({ data, showLabels, expandedTechs, showCompanies, onToggleT
       if (!visibleIds.has(n.id)) continue;
       const size = NODE_SIZES[n.type] || NODE_SIZES.Company;
       const isExpandedTech = n.type === "Technology" && expandedTechs.has(n.id);
+      const onPath = highlightPath && highlightPath.has(n.id);
+      const isClicked = n.id === highlightNode;
       ns.push({
         id: n.id,
         type: "default",
@@ -185,15 +229,17 @@ function GraphCanvas({ data, showLabels, expandedTechs, showCompanies, onToggleT
         style: {
           background: NODE_COLORS[n.type] || "#ddd",
           color: "#fff",
-          border: n.type === "Theme" ? "2px solid #c0392b" : "none",
+          border: n.type === "Theme" ? "2px solid #c0392b"
+                : isClicked ? "2px solid #333"
+                : "none",
           borderRadius: n.type === "Theme" ? 8 : 5,
           padding: n.type === "Theme" ? "10px 20px" : "6px 14px",
           fontWeight: n.type === "Theme" ? 700 : 600,
           fontSize: size.fs,
           width: size.w,
           textAlign: "center" as const,
-          cursor: n.type === "Technology" ? "pointer" : "default",
-          opacity: 1,
+          cursor: n.type === "Technology" ? "pointer" : "pointer",
+          opacity: !highlightPath || onPath ? 1 : 0.15,
         },
       });
     }
@@ -202,9 +248,10 @@ function GraphCanvas({ data, showLabels, expandedTechs, showCompanies, onToggleT
       if (!visibleEdges.has(i)) return;
       const eType = e.type || "";
       const isCompanyEdge = eType === "EXPOSED_TO";
-      // For layout, company edges go Theme→Company (not Company→Theme)
       const src = isCompanyEdge ? e.target : e.source;
       const tgt = isCompanyEdge ? e.source : e.target;
+      const onPath = highlightPath && highlightPath.has(e.source) && highlightPath.has(e.target);
+      const hlColor = HIGHLIGHT_COLORS[eType] || NEUTRAL_EDGE;
 
       es.push({
         id: `e-${i}`,
@@ -212,9 +259,9 @@ function GraphCanvas({ data, showLabels, expandedTechs, showCompanies, onToggleT
         target: tgt,
         data: { originalType: eType },
         label: showLabels ? (EDGE_LABELS[eType] || "") : "",
-        markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: NEUTRAL_EDGE },
-        style: { stroke: NEUTRAL_EDGE, strokeWidth: 1.3 },
-        labelStyle: { fontSize: 9, fill: "#94a3b8" },
+        markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: onPath ? hlColor : NEUTRAL_EDGE },
+        style: { stroke: onPath ? hlColor : NEUTRAL_EDGE, strokeWidth: onPath ? 2.5 : 1.3 },
+        labelStyle: { fontSize: 9, fill: onPath ? hlColor : "#94a3b8" },
         labelBgStyle: { fill: "rgba(255,255,255,0.8)" },
         labelBgPadding: [3, 2] as [number, number],
         labelBgBorderRadius: 3,
@@ -235,27 +282,47 @@ function GraphCanvas({ data, showLabels, expandedTechs, showCompanies, onToggleT
     setEdges(layouted.edges);
   }, [layouted.nodes, layouted.edges, setNodes, setEdges]);
 
+  // fitView on layout changes (expand/collapse), center on expanded node
   useEffect(() => {
-    if (initialLoad.current && layouted.nodes.length > 0) {
-      initialLoad.current = false;
-      const t = setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 200);
-      return () => clearTimeout(t);
-    }
-  }, [layouted.nodes.length, fitView]);
+    if (layouted.nodes.length === 0) return;
+    if (!layoutChanged.current) { layoutChanged.current = true; return; }
+    const t = setTimeout(() => {
+      if (lastExpandedRef.current) {
+        setCenter(
+          layouted.nodes.find((n) => n.id === lastExpandedRef.current)?.position?.x ?? 0,
+          layouted.nodes.find((n) => n.id === lastExpandedRef.current)?.position?.y ?? 0,
+          { zoom: 0.8, duration: 300 }
+        );
+        lastExpandedRef.current = null;
+      } else {
+        fitView({ padding: 0.25, duration: 300 });
+      }
+    }, 200);
+    return () => clearTimeout(t);
+  }, [layouted.nodes.length, fitView, setCenter, layouted.nodes]);
 
-  useEffect(() => {
-    initialLoad.current = true;
-  }, [data]);
+  useEffect(() => { layoutChanged.current = false; }, [data]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       const nType = data?.nodes.find((n) => n.id === node.id)?.type;
       if (nType === "Technology") {
-        onToggleTech(node.id);
+        const wasExpanded = expandedTechs.has(node.id);
+        if (wasExpanded) {
+          onToggleTech(node.id); // collapsing → fitView
+        } else {
+          lastExpandedRef.current = node.id;
+          onToggleTech(node.id); // expanding → center on this node
+        }
+      } else {
+        // Non-tech node: toggle highlight path to root
+        onHighlight(highlightNode === node.id ? null : node.id);
       }
     },
-    [data, onToggleTech]
+    [data, onToggleTech, onHighlight, expandedTechs, highlightNode]
   );
+
+  const handlePaneClick = useCallback(() => onHighlight(null), [onHighlight]);
 
   return (
     <ReactFlow
@@ -264,6 +331,7 @@ function GraphCanvas({ data, showLabels, expandedTechs, showCompanies, onToggleT
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onNodeClick={handleNodeClick}
+      onPaneClick={handlePaneClick}
       fitView
       nodesDraggable={false}
       nodesConnectable={false}
@@ -284,6 +352,7 @@ export default function IndustryChainGraph({ data }: Props) {
   const [showLabels, setShowLabels] = useState(false);
   const [expandedTechs, setExpandedTechs] = useState<Set<string>>(new Set());
   const [showCompanies, setShowCompanies] = useState(false);
+  const [highlightNode, setHighlightNode] = useState<string | null>(null);
 
   const toggleTech = useCallback((techId: string) => {
     setExpandedTechs((prev) => {
@@ -293,6 +362,8 @@ export default function IndustryChainGraph({ data }: Props) {
       return next;
     });
   }, []);
+
+  const handleHighlight = useCallback((nodeId: string | null) => setHighlightNode(nodeId), []);
 
   const toggleFullscreen = useCallback(() => setFullscreen((f) => !f), []);
 
@@ -340,7 +411,9 @@ export default function IndustryChainGraph({ data }: Props) {
             showLabels={showLabels}
             expandedTechs={expandedTechs}
             showCompanies={showCompanies}
+            highlightNode={highlightNode}
             onToggleTech={toggleTech}
+            onHighlight={handleHighlight}
           />
         </ReactFlowProvider>
 
@@ -364,10 +437,18 @@ export default function IndustryChainGraph({ data }: Props) {
           </button>
           {expandedTechs.size > 0 && (
             <button
-              onClick={() => setExpandedTechs(new Set())}
+              onClick={() => { setExpandedTechs(new Set()); setHighlightNode(null); }}
               className="bg-white/95 border border-orange-300 rounded px-2.5 py-1.5 text-xs font-medium text-orange-600 shadow-sm"
             >
               收起全部
+            </button>
+          )}
+          {highlightNode && (
+            <button
+              onClick={() => setHighlightNode(null)}
+              className="bg-white/95 border border-orange-300 rounded px-2.5 py-1.5 text-xs font-medium text-orange-600 shadow-sm"
+            >
+              清除高亮
             </button>
           )}
           {!fullscreen && (
