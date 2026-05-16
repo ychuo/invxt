@@ -13,7 +13,6 @@ import ReactFlow, {
   ReactFlowProvider,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import dagre from "dagre";
 import type { GraphData } from "@/types";
 
 const NODE_COLORS: Record<string, string> = {
@@ -106,33 +105,75 @@ function getPathToRoot(
   return path;
 }
 
-function layoutDagre(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
-  const g = new dagre.graphlib.Graph();
-  g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "LR", nodesep: 60, ranksep: 160, marginx: 50, marginy: 50 });
+const LEVEL_ORDER: Record<string, number> = {
+  Theme: 0,
+  Technology: 1,
+  Material: 2,
+  Equipment: 2,
+  Product: 2,
+  Company: 3,
+};
 
-  for (const n of nodes) {
-    const size = NODE_SIZES[n.type || "Company"] || NODE_SIZES.Company;
-    g.setNode(n.id, { width: size.w, height: size.h });
+function layoutRadial(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
+  // BFS from Theme roots to assign levels
+  const adj = new Map<string, Set<string>>();
+  for (const e of edges) {
+    const s = e.data?.originalType === "EXPOSED_TO" ? e.target : e.source;
+    const t = e.data?.originalType === "EXPOSED_TO" ? e.source : e.target;
+    if (!adj.has(s)) adj.set(s, new Set());
+    if (!adj.has(t)) adj.set(t, new Set());
+    adj.get(s)!.add(t);
+    adj.get(t)!.add(s);
   }
 
-  for (const e of edges) {
-    // Reverse EXPOSED_TO edges for layout: Company→Theme → Theme→Company
-    // This gives consistent top→bottom flow
-    if (e.data?.originalType === "EXPOSED_TO") {
-      g.setEdge(e.target, e.source);
-    } else {
-      g.setEdge(e.source, e.target);
+  const levels = new Map<string, number>();
+  const queue: string[] = [];
+
+  // Find theme roots
+  for (const n of nodes) {
+    if (n.type === "Theme") {
+      levels.set(n.id, 0);
+      queue.push(n.id);
     }
   }
 
-  dagre.layout(g);
+  // BFS
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const currentLevel = levels.get(current)!;
+    const neighbors = adj.get(current);
+    if (neighbors) {
+      for (const neighbor of neighbors) {
+        if (!levels.has(neighbor)) {
+          levels.set(neighbor, currentLevel + 1);
+          queue.push(neighbor);
+        }
+      }
+    }
+  }
+
+  // Group nodes by level
+  const byLevel = new Map<number, Node[]>();
+  for (const n of nodes) {
+    const level = levels.get(n.id) ?? LEVEL_ORDER[n.type || "Company"] ?? 2;
+    if (!byLevel.has(level)) byLevel.set(level, []);
+    byLevel.get(level)!.push(n);
+  }
+
+  const maxLevel = Math.max(...byLevel.keys());
+  const ringGap = 220;
+  const centerGap = 80;
 
   const laidOut = nodes.map((n) => {
-    const pos = g.node(n.id);
-    if (!pos) return n;
-    const size = NODE_SIZES[n.type || "Company"] || NODE_SIZES.Company;
-    return { ...n, position: { x: pos.x - size.w / 2, y: pos.y - size.h / 2 } };
+    const level = levels.get(n.id) ?? LEVEL_ORDER[n.type || "Company"] ?? 2;
+    const ring = byLevel.get(level)!;
+    const idx = ring.indexOf(n);
+    const total = ring.length;
+    const radius = level === 0 ? 0 : centerGap + (level - 0.5) * ringGap;
+    const angle = total <= 1 ? 0 : (idx / total) * Math.PI * 2 - Math.PI / 2;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    return { ...n, position: { x, y } };
   });
 
   return { nodes: laidOut, edges };
@@ -242,7 +283,7 @@ function GraphCanvas({ data, showLabels, highlightNode, onNodeClick }: CanvasPro
     });
   }, [data, showLabels, highlightPath]);
 
-  const layouted = useMemo(() => layoutDagre(rawNodes, allEdges), [rawNodes, allEdges]);
+  const layouted = useMemo(() => layoutRadial(rawNodes, allEdges), [rawNodes, allEdges]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layouted.edges);
