@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, useState, useCallback } from "react";
+import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import ReactFlow, {
   Node,
   Edge,
@@ -48,6 +48,8 @@ const HIGHLIGHT_COLORS: Record<string, string> = {
   EXPOSED_TO: "#00b894",
 };
 
+const NEUTRAL_EDGE = "#cbd5e1";
+
 const LEGEND_ITEMS = [
   { type: "Theme", label: "主题" },
   { type: "Technology", label: "技术方向" },
@@ -56,10 +58,58 @@ const LEGEND_ITEMS = [
   { type: "Company", label: "相关公司" },
 ];
 
+// BFS from root(s) to compute shortest-path tree (parent pointers)
+// Returns: Map<nodeId, parentNodeId> where parent is one step closer to root
+function buildParentMap(
+  nodes: { id: string; type: string }[],
+  adjacency: Map<string, Set<string>>
+): Map<string, string | null> {
+  const parents = new Map<string, string | null>();
+  const queue: string[] = [];
+
+  // Roots = Theme nodes
+  for (const n of nodes) {
+    if (n.type === "Theme") {
+      parents.set(n.id, null);
+      queue.push(n.id);
+    }
+  }
+
+  // BFS from roots outward
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const neighbors = adjacency.get(current);
+    if (neighbors) {
+      for (const neighbor of neighbors) {
+        if (!parents.has(neighbor)) {
+          parents.set(neighbor, current);
+          queue.push(neighbor);
+        }
+      }
+    }
+  }
+  return parents;
+}
+
+// Trace from nodeId up to root via parent pointers
+function getPathToRoot(
+  nodeId: string,
+  parents: Map<string, string | null>
+): Set<string> {
+  const path = new Set<string>();
+  let current: string | null | undefined = nodeId;
+  while (current) {
+    path.add(current);
+    current = parents.get(current);
+    if (current === null) break; // reached root
+  }
+  return path;
+}
+
 function layoutDagre(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", nodesep: 80, ranksep: 120, marginx: 60, marginy: 60 });
+  g.setGraph({ rankdir: "TB", nodesep: 90, ranksep: 130, marginx: 60, marginy: 60 });
 
   for (const n of nodes) {
     const size = NODE_SIZES[n.type || "Company"] || NODE_SIZES.Company;
@@ -67,7 +117,13 @@ function layoutDagre(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge
   }
 
   for (const e of edges) {
-    g.setEdge(e.source, e.target);
+    // Reverse EXPOSED_TO edges for layout: Company→Theme → Theme→Company
+    // This gives consistent top→bottom flow
+    if (e.data?.originalType === "EXPOSED_TO") {
+      g.setEdge(e.target, e.source);
+    } else {
+      g.setEdge(e.source, e.target);
+    }
   }
 
   dagre.layout(g);
@@ -90,12 +146,36 @@ interface CanvasProps {
 }
 
 function GraphCanvas({ data, showLabels, highlightNode, onNodeClick }: CanvasProps) {
+  const initialLoad = useRef(true);
+  const { fitView } = useReactFlow();
+
+  // Build adjacency and parent map for path-to-root highlighting
+  const { adjacency, parents } = useMemo(() => {
+    const adj = new Map<string, Set<string>>();
+    if (!data) return { adjacency: adj, parents: new Map() };
+    for (const e of data.edges) {
+      if (!adj.has(e.source)) adj.set(e.source, new Set());
+      if (!adj.has(e.target)) adj.set(e.target, new Set());
+      adj.get(e.source)!.add(e.target);
+      adj.get(e.target)!.add(e.source);
+    }
+    const p = buildParentMap(data.nodes, adj);
+    return { adjacency: adj, parents: p };
+  }, [data]);
+
+  // Path from highlighted node to root
+  const highlightPath = useMemo(() => {
+    if (!highlightNode) return null;
+    return getPathToRoot(highlightNode, parents);
+  }, [highlightNode, parents]);
+
   const { nodes: rawNodes, edges: rawEdges } = useMemo(() => {
     if (!data) return { nodes: [] as Node[], edges: [] as Edge[] };
 
     const ns: Node[] = data.nodes.map((n) => {
       const size = NODE_SIZES[n.type] || NODE_SIZES.Company;
-      const isHighlighted = !highlightNode || n.id === highlightNode;
+      const onPath = highlightPath && highlightPath.has(n.id);
+      const isClicked = n.id === highlightNode;
       return {
         id: n.id,
         type: "default",
@@ -106,7 +186,7 @@ function GraphCanvas({ data, showLabels, highlightNode, onNodeClick }: CanvasPro
           color: "#fff",
           border: n.type === "Theme"
             ? "2px solid #c0392b"
-            : n.id === highlightNode
+            : isClicked
             ? "2px solid #333"
             : "none",
           borderRadius: n.type === "Theme" ? 8 : 5,
@@ -115,58 +195,77 @@ function GraphCanvas({ data, showLabels, highlightNode, onNodeClick }: CanvasPro
           fontSize: size.fs,
           width: size.w,
           textAlign: "center" as const,
-          opacity: isHighlighted || !highlightNode ? 1 : 0.3,
+          opacity: !highlightPath || onPath ? 1 : 0.15,
           cursor: "pointer",
         },
       };
     });
 
     return { nodes: ns, edges: [] };
-  }, [data, highlightNode]);
+  }, [data, highlightPath, highlightNode]);
 
   const allEdges: Edge[] = useMemo(() => {
     if (!data) return [];
     return data.edges.map((e, i) => {
       const eType = e.type || "";
-      const hlColor = HIGHLIGHT_COLORS[eType] || "#94a3b8";
-      const isHighlighted =
-        !highlightNode || e.source === highlightNode || e.target === highlightNode;
+      const onPath =
+        highlightPath &&
+        highlightPath.has(e.source) &&
+        highlightPath.has(e.target);
+      const hlColor = HIGHLIGHT_COLORS[eType] || NEUTRAL_EDGE;
 
       return {
         id: `e-${i}`,
         source: e.source,
         target: e.target,
+        data: { originalType: eType },
         label: showLabels ? (EDGE_LABELS[eType] || eType) : "",
         markerEnd: {
           type: MarkerType.ArrowClosed,
           width: 16, height: 16,
-          color: isHighlighted || !highlightNode ? hlColor : "#ddd",
+          color: onPath ? hlColor : NEUTRAL_EDGE,
         },
         style: {
-          stroke: isHighlighted || !highlightNode ? hlColor : "#eee",
-          strokeWidth: isHighlighted && highlightNode ? 2.5 : 1.5,
-          opacity: isHighlighted || !highlightNode ? 1 : 0.15,
+          stroke: onPath ? hlColor : NEUTRAL_EDGE,
+          strokeWidth: onPath ? 2.5 : 1.2,
+          opacity: !highlightPath || onPath ? 1 : 0.06,
         },
-        labelStyle: { fontSize: 9, fill: hlColor, fontWeight: 400 },
+        labelStyle: {
+          fontSize: 9,
+          fill: onPath ? hlColor : "#94a3b8",
+          fontWeight: 400,
+        },
         labelBgStyle: { fill: "rgba(255,255,255,0.85)" },
         labelBgPadding: [4, 2] as [number, number],
         labelBgBorderRadius: 3,
       };
     });
-  }, [data, showLabels, highlightNode]);
+  }, [data, showLabels, highlightPath]);
 
   const layouted = useMemo(() => layoutDagre(rawNodes, allEdges), [rawNodes, allEdges]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layouted.edges);
-  const { fitView } = useReactFlow();
 
+  // Sync nodes/edges on layout change
   useEffect(() => {
     setNodes(layouted.nodes);
     setEdges(layouted.edges);
-    const timer = setTimeout(() => fitView({ padding: 0.15, duration: 300 }), 150);
-    return () => clearTimeout(timer);
-  }, [layouted.nodes, layouted.edges, setNodes, setEdges, fitView]);
+  }, [layouted.nodes, layouted.edges, setNodes, setEdges]);
+
+  // fitView only on initial data load, not on highlight changes
+  useEffect(() => {
+    if (initialLoad.current && layouted.nodes.length > 0) {
+      initialLoad.current = false;
+      const timer = setTimeout(() => fitView({ padding: 0.15, duration: 300 }), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [layouted.nodes.length, fitView]);
+
+  // Reset initialLoad when data identity changes (new topic)
+  useEffect(() => {
+    initialLoad.current = true;
+  }, [data]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -274,7 +373,7 @@ export default function IndustryChainGraph({ data }: Props) {
           )}
         </div>
 
-        {/* Legend — bottom-left, with left padding to avoid Controls */}
+        {/* Legend — bottom-left */}
         <div className="absolute bottom-2 left-2 z-10 bg-white/90 border rounded-lg px-3 py-2 shadow-sm">
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
             {LEGEND_ITEMS.map((item) => (
