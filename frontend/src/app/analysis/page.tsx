@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { submitAnalysis, getAnalysis, getAnalysisByTopic, getGraph } from "@/lib/api";
 import type { AnalysisState, GraphData } from "@/types";
@@ -20,10 +20,12 @@ export default function AnalysisPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [taskId, setTaskId] = useState<string | null>(null);
+  const startedRef = useRef(false);
 
   // Step 1: Check cache or submit new analysis
   useEffect(() => {
-    if (!topic) return;
+    if (!topic || startedRef.current) return;
+    startedRef.current = true;
 
     let mounted = true;
 
