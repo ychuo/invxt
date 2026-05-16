@@ -55,6 +55,9 @@ export default function IndustryChainGraph({ data }: Props) {
     return () => document.removeEventListener("keydown", onKey);
   }, [fullscreen]);
 
+  // Auto-center on fullscreen toggle
+  useEffect(() => { autoCenter(); }, [fullscreen]);
+
   const adjacency = useMemo(() => (data ? buildAdjacency(data) : new Map()), [data]);
   const nodeTypes = useMemo(() => { const m = new Map<string,string>(); if (data) for (const n of data.nodes) m.set(n.id, n.type); return m; }, [data]);
   const highlightSet = useMemo(() => highlightNode ? getNeighborhood(highlightNode, adjacency, nodeTypes) : null, [highlightNode, adjacency, nodeTypes]);
