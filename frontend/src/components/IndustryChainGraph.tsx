@@ -36,11 +36,23 @@ function buildParentMap(data: GraphData): Map<string, string | null> {
   return parents;
 }
 
-function getPathToRoot(nodeId: string, parents: Map<string, string | null>): Set<string> {
-  const path = new Set<string>();
-  let cur: string | null | undefined = nodeId;
-  while (cur) { path.add(cur); cur = parents.get(cur); if (cur === null) break; }
-  return path;
+// Build adjacency map for neighborhood highlight
+function buildAdjacency(data: GraphData): Map<string, Set<string>> {
+  const adj = new Map<string, Set<string>>();
+  for (const e of data.edges) {
+    if (!adj.has(e.source)) adj.set(e.source, new Set());
+    if (!adj.has(e.target)) adj.set(e.target, new Set());
+    adj.get(e.source)!.add(e.target);
+    adj.get(e.target)!.add(e.source);
+  }
+  return adj;
+}
+
+function getNeighborhood(nodeId: string, adj: Map<string, Set<string>>): Set<string> {
+  const nb = new Set<string>();
+  nb.add(nodeId);
+  for (const n of adj.get(nodeId) || []) nb.add(n);
+  return nb;
 }
 
 export default function IndustryChainGraph({ data }: Props) {
@@ -56,6 +68,8 @@ export default function IndustryChainGraph({ data }: Props) {
   const resetKey = useRef(0);
   const lastPinchDist = useRef<number>(0);
   const lastPinchZoom = useRef(1);
+  const zoomRef = useRef(1);
+  zoomRef.current = zoom;
 
   const toggleFullscreen = useCallback(() => setFullscreen((f) => !f), []);
   const toggleTech = useCallback((techId: string) => {
@@ -69,8 +83,8 @@ export default function IndustryChainGraph({ data }: Props) {
     return () => document.removeEventListener("keydown", onKey);
   }, [fullscreen]);
 
-  const parents = useMemo(() => (data ? buildParentMap(data) : new Map()), [data]);
-  const highlightPath = useMemo(() => highlightNode ? getPathToRoot(highlightNode, parents) : null, [highlightNode, parents]);
+  const adjacency = useMemo(() => (data ? buildAdjacency(data) : new Map()), [data]);
+  const highlightSet = useMemo(() => highlightNode ? getNeighborhood(highlightNode, adjacency) : null, [highlightNode, adjacency]);
 
   const visibleIds = useMemo(() => {
     const s = new Set<string>();
@@ -183,7 +197,7 @@ export default function IndustryChainGraph({ data }: Props) {
   // Touch pinch zoom
   useEffect(() => {
     const el = containerRef.current; if (!el) return;
-    const onTouchStart = (e: TouchEvent) => { if (e.touches.length === 2) { lastPinchDist.current = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); lastPinchZoom.current = zoom; } };
+    const onTouchStart = (e: TouchEvent) => { if (e.touches.length === 2) { lastPinchDist.current = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); lastPinchZoom.current = zoomRef.current; } };
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length !== 2 || lastPinchDist.current === 0) return;
       e.preventDefault();
@@ -195,7 +209,7 @@ export default function IndustryChainGraph({ data }: Props) {
     el.addEventListener("touchmove", onTouchMove, { passive: false });
     el.addEventListener("touchend", onTouchEnd);
     return () => { el.removeEventListener("touchstart", onTouchStart); el.removeEventListener("touchmove", onTouchMove); el.removeEventListener("touchend", onTouchEnd); };
-  }, [zoom]);
+  }, []);
 
   if (!data || data.nodes.length === 0) {
     return <div className="h-64 flex items-center justify-center text-gray-400 border rounded-lg">暂无图谱数据</div>;
@@ -220,20 +234,20 @@ export default function IndustryChainGraph({ data }: Props) {
                 {layout.links.map((link, i) => {
                   const sid = (link.source as any).id || (link.source as any).name || "";
                   const tid = (link.target as any).id || (link.target as any).name || "";
-                  const onPath = !highlightPath || (highlightPath.has(sid) && highlightPath.has(tid));
+                  const onPath = !highlightSet || (highlightSet.has(sid) && highlightSet.has(tid));
                   const w = Math.max(1, link.width ?? 1);
                   const p = sankeyLinkHorizontal()(link as any);
                   if (!p) return null;
-                  return <path key={i} d={p} fill="none" stroke={NODE_COLORS[(link.target as any).type] || "#94a3b8"} strokeWidth={w} strokeOpacity={!highlightPath || onPath ? 0.45 : 0.04} />;
+                  return <path key={i} d={p} fill="none" stroke={NODE_COLORS[(link.target as any).type] || "#94a3b8"} strokeWidth={w} strokeOpacity={!highlightSet || onPath ? 0.45 : 0.04} />;
                 })}
                 {/* Nodes */}
                 {layout.nodes.map((node) => {
                   const x = node.x0 ?? 0, y = node.y0 ?? 0, w = (node.x1 ?? 0) - x, h = Math.max(20, (node.y1 ?? 0) - y);
                   const isExpanded = node.type === "Technology" && expandedTechs.has(node.id as string);
-                  const onPath = highlightPath && highlightPath.has(node.id as string);
+                  const onPath = highlightSet && highlightSet.has(node.id as string);
                   return (
                     <g key={node.id as string} transform={`translate(${x},${y})`} onClick={(e) => { e.stopPropagation(); handleNodeClick(node.id as string); }}
-                       onMouseEnter={() => {}} onMouseLeave={() => {}} style={{ cursor: "pointer" }} opacity={!highlightPath || onPath ? 1 : 0.12}>
+                       onMouseEnter={() => {}} onMouseLeave={() => {}} style={{ cursor: "pointer" }} opacity={!highlightSet || onPath ? 1 : 0.12}>
                       <rect width={Math.max(w, 10)} height={h} rx={4} fill={NODE_COLORS[node.type] || "#ddd"} stroke={node.id === highlightNode ? "#333" : "none"} strokeWidth={node.id === highlightNode ? 2 : 0} />
                       <text x={w + 4} y={h / 2} dy="0.35em" fontSize={h > 28 ? 11 : 9} fill="#333" fontWeight={node.type === "Theme" ? 700 : 600} textAnchor="start">
                         {(node.type === "Technology" ? (isExpanded ? "▾ " : "▸ ") : "") + (node.id as string)}
