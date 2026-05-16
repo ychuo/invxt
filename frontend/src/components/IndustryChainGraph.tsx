@@ -17,7 +17,17 @@ function buildAdjacency(data: GraphData): Map<string, Set<string>> {
 
 function getNeighborhood(nodeId: string, adj: Map<string, Set<string>>, nodeTypes: Map<string, string>): Set<string> {
   const nb = new Set<string>(); nb.add(nodeId);
-  for (const n1 of adj.get(nodeId) || []) { nb.add(n1); if (nodeTypes.get(n1) === "Technology") for (const n2 of adj.get(n1) || []) nb.add(n2); }
+  const clickedType = nodeTypes.get(nodeId);
+  for (const n1 of adj.get(nodeId) || []) {
+    nb.add(n1);
+    // 2-hop only when clicking Material/Equipment (to reach Company via Technology)
+    // For Company/Theme/Technology, 1-hop is enough
+    if (clickedType === "Material" || clickedType === "Equipment") {
+      if (nodeTypes.get(n1) === "Technology") {
+        for (const n2 of adj.get(n1) || []) nb.add(n2);
+      }
+    }
+  }
   return nb;
 }
 
