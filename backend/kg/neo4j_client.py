@@ -117,21 +117,77 @@ class Neo4jClient:
             return [dict(record["props"]) | {"id": str(record["id"])} for record in result]
 
     def get_theme_graph(self, theme_name: str) -> dict:
+        """Build graph from separate small queries to avoid Cartesian explosion."""
+        node_map: dict[str, dict] = {}  # name -> {id, type, data}
+        edge_set: set[tuple[str, str, str]] = set()  # (source, target, type)
+
+        def add_node(name, ntype, data=None):
+            if name and name not in node_map:
+                node_map[name] = {"id": name, "type": ntype, "data": data or {}}
+
         with self._driver.session() as session:
-            # Return paths individually — avoid nested aggregation
+            # 1. Theme node
+            result = session.run(
+                "MATCH (th:Theme {name: $name}) RETURN th", name=theme_name
+            )
+            th = result.single()
+            if not th:
+                return {"nodes": [], "edges": []}
+            th_data = dict(th["th"])
+            add_node(th_data["name"], "Theme", th_data)
+
+            # 2. Technologies and their materials/equipment
             result = session.run(
                 """
-                MATCH (th:Theme {name: $theme_name})
-                OPTIONAL MATCH (th)-[:REQUIRES]->(t:Technology)
+                MATCH (th:Theme {name: $name})-[:REQUIRES]->(t:Technology)
                 OPTIONAL MATCH (t)-[:USES_MATERIAL]->(m:Material)
                 OPTIONAL MATCH (t)-[:USES_EQUIPMENT]->(e:Equipment)
-                OPTIONAL MATCH (c_exp:Company)-[r:EXPOSED_TO]->(th)
-                OPTIONAL MATCH (t)<-[:SUPPLIES]-(c_sup:Company)
-                RETURN th, t, m, e, c_exp, r, c_sup
+                RETURN t, collect(DISTINCT m) AS materials, collect(DISTINCT e) AS equipments
                 """,
-                theme_name=theme_name,
+                name=theme_name,
             )
-            return self._format_graph_result(list(result))
+            for rec in result:
+                t = rec["t"]
+                t_name = t["name"]
+                add_node(t_name, "Technology", dict(t))
+                edge_set.add((theme_name, t_name, "REQUIRES"))
+                for m in rec.get("materials") or []:
+                    if m and m.get("name"):
+                        add_node(m["name"], "Material", dict(m))
+                        edge_set.add((t_name, m["name"], "USES_MATERIAL"))
+                for e in rec.get("equipments") or []:
+                    if e and e.get("name"):
+                        add_node(e["name"], "Equipment", dict(e))
+                        edge_set.add((t_name, e["name"], "USES_EQUIPMENT"))
+
+            # 3. Companies exposed to theme
+            result = session.run(
+                "MATCH (c:Company)-[r:EXPOSED_TO]->(th:Theme {name: $name}) RETURN c, r",
+                name=theme_name,
+            )
+            for rec in result:
+                c = rec["c"]
+                r = rec["r"]
+                add_node(c["name"], "Company", dict(c))
+                edge_set.add((c["name"], theme_name, "EXPOSED_TO"))
+
+            # 4. Companies supplying to technologies
+            result = session.run(
+                """
+                MATCH (th:Theme {name: $name})-[:REQUIRES]->(t:Technology)
+                MATCH (c:Company)-[:SUPPLIES]->(t)
+                RETURN c, t
+                """,
+                name=theme_name,
+            )
+            for rec in result:
+                c, t = rec["c"], rec["t"]
+                add_node(c["name"], "Company", dict(c))
+                edge_set.add((c["name"], t["name"], "SUPPLIES"))
+
+        nodes = list(node_map.values())
+        edges = [{"source": s, "target": t, "type": tp} for s, t, tp in edge_set]
+        return {"nodes": nodes, "edges": edges}
 
     def _format_graph_result(self, records) -> dict:
         node_map: dict[str, dict] = {}  # name -> node

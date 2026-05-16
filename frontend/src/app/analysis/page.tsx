@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { submitAnalysis, getAnalysis, getAnalysisByTopic, getGraph } from "@/lib/api";
 import type { AnalysisState, GraphData } from "@/types";
@@ -20,40 +20,33 @@ export default function AnalysisPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [taskId, setTaskId] = useState<string | null>(null);
-  const initRef = useRef<Promise<void> | null>(null);
 
   // Step 1: Check cache or submit new analysis
   useEffect(() => {
     if (!topic) return;
 
-    let mounted = true;
+    let ignore = false;
 
-    const doLoad = async () => {
+    (async () => {
       try {
         const cached = await getAnalysisByTopic(topic, market);
-        if (cached && mounted) {
+        if (ignore) return;
+        if (cached) {
           setState(cached);
           setLoading(false);
           return;
         }
         const { task_id } = await submitAnalysis(topic, market);
-        if (mounted) setTaskId(task_id);
+        if (!ignore) setTaskId(task_id);
       } catch (err) {
-        if (mounted) {
+        if (!ignore) {
           setError(String(err));
           setLoading(false);
         }
       }
-    };
+    })();
 
-    // Dedup: if a load is already in flight from StrictMode double-mount, chain onto it
-    if (initRef.current) {
-      initRef.current.then(() => { if (mounted) doLoad(); });
-    } else {
-      initRef.current = doLoad().then(() => { initRef.current = null; });
-    }
-
-    return () => { mounted = false; };
+    return () => { ignore = true; };
   }, [topic, market]);
 
   // Step 2: Poll for results
