@@ -46,6 +46,19 @@ async def create_analysis(req: AnalyzeRequest):
     import uuid
     task_id = str(uuid.uuid4())
 
+    # Write initial state so polling doesn't 404
+    redis = aioredis.from_url(settings.redis_url)
+    await redis.setex(
+        f"analysis:{task_id}",
+        3600,
+        json.dumps({
+            "task_id": task_id, "topic": req.topic, "market": req.market,
+            "status": "running", "current_step": "starting",
+            "theme": None, "chain": [], "companies": [], "scored": [], "error": None,
+        }),
+    )
+    await redis.close()
+
     # Fire-and-forget background task
     asyncio.create_task(_run_and_cache(req.topic, req.market, task_id))
 

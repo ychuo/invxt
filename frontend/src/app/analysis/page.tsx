@@ -93,14 +93,14 @@ export default function AnalysisPage() {
     };
   }, [taskId]);
 
-  // Step 3: Fetch graph data when theme is ready
+  // Step 3: Fetch graph data when theme is ready (use original topic)
   useEffect(() => {
-    if (state?.theme?.theme_name) {
-      getGraph(state.theme.theme_name)
+    if (state?.topic) {
+      getGraph(state.topic)
         .then(setGraphData)
         .catch(() => {});
     }
-  }, [state?.theme?.theme_name]);
+  }, [state?.topic]);
 
   if (!topic) {
     return (

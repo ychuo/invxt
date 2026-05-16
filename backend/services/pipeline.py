@@ -118,14 +118,14 @@ class AnalysisPipeline:
             await self._emit(state)
             return state
 
-        # Step 4: Scoring
+        # Step 4: Scoring (use original topic for graph consistency)
         state.current_step = "scoring"
         await self._emit(state)
+        display_name = state.theme_result.get("theme_name", topic)
         try:
-            theme_name = state.theme_result.get("theme_name", topic)
-            state.scored_results = await self._scoring_agent.score(theme_name, state.company_results)
+            state.scored_results = await self._scoring_agent.score(display_name, state.company_results)
             try:
-                self._scoring_agent.write_to_graph(theme_name, state.scored_results)
+                self._scoring_agent.write_to_graph(topic, state.scored_results)
             except Exception:
                 pass
             state.current_step = "scoring_completed"
@@ -136,12 +136,13 @@ class AnalysisPipeline:
             await self._emit(state)
             return state
 
-        # Persist theme node
+        # Persist/update theme node under original topic name
         try:
             theme = ThemeEntity(
-                name=theme_name,
+                name=topic,
                 description=state.theme_result.get("summary", ""),
                 category=state.theme_result.get("category", ""),
+                aliases=[display_name] if display_name != topic else [],
             )
             self._neo4j.merge_entity(theme)
         except Exception:
