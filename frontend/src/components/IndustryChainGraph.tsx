@@ -109,7 +109,7 @@ function getPathToRoot(
 function layoutDagre(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", nodesep: 90, ranksep: 130, marginx: 60, marginy: 60 });
+  g.setGraph({ rankdir: "LR", nodesep: 60, ranksep: 160, marginx: 50, marginy: 50 });
 
   for (const n of nodes) {
     const size = NODE_SIZES[n.type || "Company"] || NODE_SIZES.Company;
