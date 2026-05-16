@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import ReactFlow, {
   Node,
   Edge,
@@ -58,8 +58,13 @@ export default function IndustryChainGraph({ data }: Props) {
     }));
   }, [data]);
 
-  const [nodes, _, onNodesChange] = useNodesState(initialNodes);
-  const [edges, __, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   if (!data || data.nodes.length === 0) {
     return (
