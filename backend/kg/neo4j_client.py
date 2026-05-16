@@ -198,7 +198,7 @@ class Neo4jClient:
 
         return {"nodes": nodes, "edges": edges}
 
-    def search_entities(self, query: str, limit: int = 20) -> list[dict]:
+    def search_entities(self, search_query: str, limit: int = 20) -> list[dict]:
         with self._driver.session() as session:
             result = session.run(
                 """
@@ -207,7 +207,6 @@ class Neo4jClient:
                 RETURN properties(n) AS props, labels(n) AS labels, elementId(n) AS id
                 LIMIT $limit
                 """,
-                query=query,
-                limit=limit,
+                {"query": search_query, "limit": limit},
             )
             return [dict(record["props"]) | {"id": str(record["id"]), "labels": record["labels"]} for record in result]

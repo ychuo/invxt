@@ -29,6 +29,6 @@ async def create_analysis(req: AnalyzeRequest):
         86400,
         json.dumps(state.to_dict(), ensure_ascii=False),
     )
-    await redis.aclose()
+    await redis.close()
 
     return {"task_id": state.task_id, "topic": req.topic, "market": req.market}

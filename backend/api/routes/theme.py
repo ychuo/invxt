@@ -10,7 +10,7 @@ router = APIRouter()
 async def get_theme(theme_id: str):
     redis = aioredis.from_url(settings.redis_url)
     data = await redis.get(f"analysis:{theme_id}")
-    await redis.aclose()
+    await redis.close()
     if not data:
         raise HTTPException(status_code=404, detail="Analysis not found")
     return json.loads(data)
@@ -20,7 +20,7 @@ async def get_theme(theme_id: str):
 async def get_theme_by_name(name: str, market: str = "A"):
     redis = aioredis.from_url(settings.redis_url)
     data = await redis.get(f"analysis:topic:{name}:{market}")
-    await redis.aclose()
+    await redis.close()
     if not data:
         raise HTTPException(status_code=404, detail="Analysis not found")
     return json.loads(data)
