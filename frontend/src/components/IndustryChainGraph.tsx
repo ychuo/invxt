@@ -270,7 +270,7 @@ function GraphCanvas({ data, showLabels, expandedTechs, showCompanies, highlight
     });
 
     return { rawNodes: ns, rawEdges: es, edgeIndex: idx };
-  }, [data, visibleIds, visibleEdges, showLabels, expandedTechs]);
+  }, [data, visibleIds, visibleEdges, showLabels, expandedTechs, highlightPath, highlightNode]);
 
   const layouted = useMemo(() => layoutTree(rawNodes, rawEdges), [rawNodes, rawEdges]);
 
