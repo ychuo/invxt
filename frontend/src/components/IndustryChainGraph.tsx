@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
-import { sankey, sankeyLinkHorizontal, SankeyNode, SankeyLink } from "d3-sankey";
+import { sankey, sankeyLinkHorizontal, sankeyJustify, SankeyNode, SankeyLink } from "d3-sankey";
 import type { GraphData } from "@/types";
 
 const NODE_COLORS: Record<string, string> = {
@@ -184,16 +184,6 @@ export default function IndustryChainGraph({ data }: Props) {
     const { nodes, links } = sankeyData;
     if (nodes.length === 0) return { nodes: [], links: [] };
 
-    // Assign columns
-    const colCounts = [0, 0, 0, 0];
-    const colAssign: Record<string, number> = {};
-    for (const n of nodes) {
-      const col = n.column;
-      n.column = col;
-      colAssign[n.id] = col;
-      colCounts[col]++;
-    }
-
     // Map links to indices
     const idxMap = new Map<string, number>();
     nodes.forEach((n, i) => idxMap.set(n.id, i));
@@ -216,7 +206,7 @@ export default function IndustryChainGraph({ data }: Props) {
       .nodeWidth(nodeW)
       .nodePadding(10)
       .extent([[0, 0], [w, h]])
-      .nodeAlign((node) => colAssign[node.id ?? ""] ?? 0)
+      .nodeAlign(sankeyJustify)
       .iterations(32);
 
     const result = generator({
@@ -224,11 +214,19 @@ export default function IndustryChainGraph({ data }: Props) {
       links: sankeyLinks,
     });
 
+    // Post-process: override x0/x1 per column
+    const colWidth = w / 4;
+    for (const node of result.nodes) {
+      const col = node.column ?? 0;
+      node.x0 = col * colWidth;
+      node.x1 = node.x0 + nodeW;
+    }
+
     return {
-      nodes: result.nodes as (SankeyNode<{ id: string; type: string; column: number }, { source: number; target: number; value: number }> & { id: string; type: string })[],
+      nodes: result.nodes as any[],
       links: result.links.map((l, i) => ({ ...l, edgeType: linkMeta[i]?.edgeType ?? "" })),
-      width: result.width || 960,
-      height: Math.max(600, nodes.length * 28),
+      width: w,
+      height: h,
     };
   }, [sankeyData]);
 
@@ -459,6 +457,22 @@ export default function IndustryChainGraph({ data }: Props) {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Zoom controls */}
+        <div className="absolute bottom-2 right-2 z-10 flex gap-1">
+          <button
+            onClick={() => setZoom((z) => Math.min(5, z * 1.2))}
+            className="bg-white/95 border rounded w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-50 shadow-sm text-sm font-bold"
+          >+</button>
+          <button
+            onClick={() => setZoom((z) => Math.max(0.2, z / 1.2))}
+            className="bg-white/95 border rounded w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-50 shadow-sm text-sm font-bold"
+          >−</button>
+          <button
+            onClick={() => { setPan({ x: 0, y: 0 }); setZoom(1); }}
+            className="bg-white/95 border rounded px-2 h-7 flex items-center justify-center text-gray-500 hover:bg-gray-50 shadow-sm text-xs"
+          >复位</button>
         </div>
 
         {/* Stats */}
