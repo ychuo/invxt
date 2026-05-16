@@ -1,19 +1,7 @@
 "use client";
 
-import { useMemo, useEffect, useState, useCallback, useRef } from "react";
-import ReactFlow, {
-  Node,
-  Edge,
-  Background,
-  Controls,
-  MarkerType,
-  useNodesState,
-  useEdgesState,
-  useReactFlow,
-  ReactFlowProvider,
-} from "reactflow";
-import "reactflow/dist/style.css";
-import dagre from "dagre";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
+import { sankey, sankeyLinkHorizontal, SankeyNode, SankeyLink } from "d3-sankey";
 import type { GraphData } from "@/types";
 
 const NODE_COLORS: Record<string, string> = {
@@ -25,93 +13,34 @@ const NODE_COLORS: Record<string, string> = {
   Company: "#00b894",
 };
 
-const NODE_SIZES: Record<string, { w: number; h: number; fs: number }> = {
-  Theme: { w: 200, h: 46, fs: 15 },
-  Technology: { w: 180, h: 40, fs: 13 },
-  Company: { w: 160, h: 36, fs: 12 },
-  Product: { w: 150, h: 36, fs: 12 },
-  Material: { w: 140, h: 32, fs: 11 },
-  Equipment: { w: 140, h: 32, fs: 11 },
-};
-
-const EDGE_LABELS: Record<string, string> = {
-  REQUIRES: "",
-  USES_MATERIAL: "材料",
-  USES_EQUIPMENT: "设备",
-  EXPOSED_TO: "",
-};
-
-const HIGHLIGHT_COLORS: Record<string, string> = {
-  REQUIRES: "#e17055",
-  USES_MATERIAL: "#f39c12",
-  USES_EQUIPMENT: "#6c5ce7",
-  EXPOSED_TO: "#00b894",
-};
-
-const NEUTRAL_EDGE = "#cbd5e1";
-
 const LEGEND_ITEMS = [
   { type: "Theme", label: "主题" },
-  { type: "Technology", label: "技术方向 ▸ 点击展开" },
+  { type: "Technology", label: "技术方向" },
   { type: "Material", label: "关键材料" },
   { type: "Equipment", label: "关键设备" },
   { type: "Company", label: "相关公司" },
 ];
 
-// ---- helpers ----
-
-function buildChildMap(data: GraphData): Map<string, { id: string; type: string }[]> {
-  const m = new Map<string, { id: string; type: string }[]>();
-  // Tech → Material/Equipment (from USES_MATERIAL / USES_EQUIPMENT edges)
-  for (const e of data.edges) {
-    if (e.type === "USES_MATERIAL" || e.type === "USES_EQUIPMENT") {
-      if (!m.has(e.source)) m.set(e.source, []);
-      const childType = e.type === "USES_MATERIAL" ? "Material" : "Equipment";
-      m.get(e.source)!.push({ id: e.target, type: childType });
-    }
-  }
-  return m;
+interface SankeyDataNode {
+  id: string;
+  type: string;
+  column: number;
 }
 
-function getThemeId(data: GraphData): string {
-  const theme = data.nodes.find((n) => n.type === "Theme");
-  return theme?.id || "";
+interface SankeyDataLink {
+  source: string;
+  target: string;
+  value: number;
+  edgeType: string;
 }
 
-// ---- tree layout (dagre, top-down) ----
-
-function layoutTree(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
-  const g = new dagre.graphlib.Graph();
-  g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", nodesep: 70, ranksep: 100, marginx: 40, marginy: 40 });
-
-  for (const n of nodes) {
-    const size = NODE_SIZES[n.type || "Company"] || NODE_SIZES.Company;
-    g.setNode(n.id, { width: size.w, height: size.h });
-  }
-  for (const e of edges) {
-    g.setEdge(e.source, e.target);
-  }
-
-  dagre.layout(g);
-
-  return {
-    nodes: nodes.map((n) => {
-      const pos = g.node(n.id);
-      if (!pos) return n;
-      const size = NODE_SIZES[n.type || "Company"] || NODE_SIZES.Company;
-      return { ...n, position: { x: pos.x - size.w / 2, y: pos.y - size.h / 2 } };
-    }),
-    edges,
-  };
+interface Props {
+  data: GraphData | null;
 }
 
-// ---- canvas ----
-
-// Build parent map for path-to-root (BFS from Theme)
-function buildParentMap(graphData: GraphData): Map<string, string | null> {
+function buildParentMap(data: GraphData): Map<string, string | null> {
   const adj = new Map<string, Set<string>>();
-  for (const e of graphData.edges) {
+  for (const e of data.edges) {
     if (!adj.has(e.source)) adj.set(e.source, new Set());
     if (!adj.has(e.target)) adj.set(e.target, new Set());
     adj.get(e.source)!.add(e.target);
@@ -119,7 +48,7 @@ function buildParentMap(graphData: GraphData): Map<string, string | null> {
   }
   const parents = new Map<string, string | null>();
   const queue: string[] = [];
-  for (const n of graphData.nodes) {
+  for (const n of data.nodes) {
     if (n.type === "Theme") { parents.set(n.id, null); queue.push(n.id); }
   }
   while (queue.length > 0) {
@@ -142,218 +71,15 @@ function getPathToRoot(nodeId: string, parents: Map<string, string | null>): Set
   return path;
 }
 
-interface CanvasProps {
-  data: GraphData | null;
-  showLabels: boolean;
-  expandedTechs: Set<string>;
-  showCompanies: boolean;
-  highlightNode: string | null;
-  onToggleTech: (techId: string) => void;
-  onHighlight: (nodeId: string | null) => void;
-}
-
-function GraphCanvas({ data, showLabels, expandedTechs, showCompanies, highlightNode, onToggleTech, onHighlight }: CanvasProps) {
-  const layoutChanged = useRef(false);
-  const { fitView, setCenter } = useReactFlow();
-  const childMap = useMemo(() => (data ? buildChildMap(data) : new Map()), [data]);
-  const themeId = useMemo(() => (data ? getThemeId(data) : ""), [data]);
-  const parents = useMemo(() => (data ? buildParentMap(data) : new Map()), [data]);
-  const highlightPath = useMemo(
-    () => highlightNode ? getPathToRoot(highlightNode, parents) : null,
-    [highlightNode, parents]
-  );
-  const lastExpandedRef = useRef<string | null>(null);
-
-  // Which company nodes exist (connected via EXPOSED_TO)
-  const companyIds = useMemo(() => {
-    if (!data) return new Set<string>();
-    return new Set(
-      data.edges.filter((e) => e.type === "EXPOSED_TO").map((e) => e.source)
-    );
-  }, [data]);
-
-  // Compute visible node ids
-  const visibleIds = useMemo(() => {
-    const s = new Set<string>();
-    if (!data) return s;
-    s.add(themeId);
-    for (const n of data.nodes) {
-      if (n.type === "Technology") s.add(n.id);
-    }
-    for (const techId of expandedTechs) {
-      for (const child of childMap.get(techId) || []) {
-        s.add(child.id);
-      }
-    }
-    // Show all companies as one block at the bottom if enabled
-    if (showCompanies) {
-      for (const cid of companyIds) s.add(cid);
-    }
-    return s;
-  }, [data, themeId, expandedTechs, childMap, showCompanies, companyIds]);
-
-  // Compute visible edges
-  const visibleEdges = useMemo(() => {
-    if (!data) return new Set<number>();
-    const s = new Set<number>();
-    data.edges.forEach((e, i) => {
-      if (!visibleIds.has(e.source) || !visibleIds.has(e.target)) return;
-      s.add(i);
-    });
-    return s;
-  }, [data, visibleIds]);
-
-  // Build ReactFlow nodes + edges from visible set
-  const { rawNodes, rawEdges, edgeIndex } = useMemo(() => {
-    if (!data) return { rawNodes: [] as Node[], rawEdges: [] as Edge[], edgeIndex: new Map<number, string>() };
-
-    const ns: Node[] = [];
-    const es: Edge[] = [];
-    const idx = new Map<number, string>();
-
-    for (const n of data.nodes) {
-      if (!visibleIds.has(n.id)) continue;
-      const size = NODE_SIZES[n.type] || NODE_SIZES.Company;
-      const isExpandedTech = n.type === "Technology" && expandedTechs.has(n.id);
-      const onPath = highlightPath && highlightPath.has(n.id);
-      const isClicked = n.id === highlightNode;
-      ns.push({
-        id: n.id,
-        type: "default",
-        data: {
-          label: n.type === "Technology"
-            ? (isExpandedTech ? "▾ " : "▸ ") + n.id
-            : n.id,
-        },
-        position: { x: 0, y: 0 },
-        style: {
-          background: NODE_COLORS[n.type] || "#ddd",
-          color: "#fff",
-          border: n.type === "Theme" ? "2px solid #c0392b"
-                : isClicked ? "2px solid #333"
-                : "none",
-          borderRadius: n.type === "Theme" ? 8 : 5,
-          padding: n.type === "Theme" ? "10px 20px" : "6px 14px",
-          fontWeight: n.type === "Theme" ? 700 : 600,
-          fontSize: size.fs,
-          width: size.w,
-          textAlign: "center" as const,
-          cursor: n.type === "Technology" ? "pointer" : "pointer",
-          opacity: !highlightPath || onPath ? 1 : 0.15,
-        },
-      });
-    }
-
-    data.edges.forEach((e, i) => {
-      if (!visibleEdges.has(i)) return;
-      const eType = e.type || "";
-      const isCompanyEdge = eType === "EXPOSED_TO";
-      const src = isCompanyEdge ? e.target : e.source;
-      const tgt = isCompanyEdge ? e.source : e.target;
-      const onPath = highlightPath && highlightPath.has(e.source) && highlightPath.has(e.target);
-      const hlColor = HIGHLIGHT_COLORS[eType] || NEUTRAL_EDGE;
-
-      es.push({
-        id: `e-${i}`,
-        source: src,
-        target: tgt,
-        data: { originalType: eType },
-        label: showLabels ? (EDGE_LABELS[eType] || "") : "",
-        markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: onPath ? hlColor : NEUTRAL_EDGE },
-        style: { stroke: onPath ? hlColor : NEUTRAL_EDGE, strokeWidth: onPath ? 2.5 : 1.3 },
-        labelStyle: { fontSize: 9, fill: onPath ? hlColor : "#94a3b8" },
-        labelBgStyle: { fill: "rgba(255,255,255,0.8)" },
-        labelBgPadding: [3, 2] as [number, number],
-        labelBgBorderRadius: 3,
-      });
-      idx.set(i, `e-${i}`);
-    });
-
-    return { rawNodes: ns, rawEdges: es, edgeIndex: idx };
-  }, [data, visibleIds, visibleEdges, showLabels, expandedTechs, highlightPath, highlightNode]);
-
-  const layouted = useMemo(() => layoutTree(rawNodes, rawEdges), [rawNodes, rawEdges]);
-
-  const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(layouted.edges);
-
-  useEffect(() => {
-    setNodes(layouted.nodes);
-    setEdges(layouted.edges);
-  }, [layouted.nodes, layouted.edges, setNodes, setEdges]);
-
-  // fitView on layout changes (expand/collapse), center on expanded node
-  useEffect(() => {
-    if (layouted.nodes.length === 0) return;
-    if (!layoutChanged.current) { layoutChanged.current = true; return; }
-    const t = setTimeout(() => {
-      if (lastExpandedRef.current) {
-        setCenter(
-          layouted.nodes.find((n) => n.id === lastExpandedRef.current)?.position?.x ?? 0,
-          layouted.nodes.find((n) => n.id === lastExpandedRef.current)?.position?.y ?? 0,
-          { zoom: 0.8, duration: 300 }
-        );
-        lastExpandedRef.current = null;
-      } else {
-        fitView({ padding: 0.25, duration: 300 });
-      }
-    }, 200);
-    return () => clearTimeout(t);
-  }, [layouted.nodes.length, fitView, setCenter, layouted.nodes]);
-
-  useEffect(() => { layoutChanged.current = false; }, [data]);
-
-  const handleNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      const nType = data?.nodes.find((n) => n.id === node.id)?.type;
-      if (nType === "Technology") {
-        const wasExpanded = expandedTechs.has(node.id);
-        if (wasExpanded) {
-          onToggleTech(node.id); // collapsing → fitView
-        } else {
-          lastExpandedRef.current = node.id;
-          onToggleTech(node.id); // expanding → center on this node
-        }
-      } else {
-        // Non-tech node: toggle highlight path to root
-        onHighlight(highlightNode === node.id ? null : node.id);
-      }
-    },
-    [data, onToggleTech, onHighlight, expandedTechs, highlightNode]
-  );
-
-  const handlePaneClick = useCallback(() => onHighlight(null), [onHighlight]);
-
-  return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onNodeClick={handleNodeClick}
-      onPaneClick={handlePaneClick}
-      fitView
-      nodesDraggable={false}
-      nodesConnectable={false}
-      elementsSelectable={false}
-      minZoom={0.1}
-      maxZoom={3}
-    >
-      <Background color="#f1f5f9" gap={20} />
-      <Controls position="bottom-right" />
-    </ReactFlow>
-  );
-}
-
-// ---- main component ----
-
 export default function IndustryChainGraph({ data }: Props) {
   const [fullscreen, setFullscreen] = useState(false);
-  const [showLabels, setShowLabels] = useState(false);
   const [expandedTechs, setExpandedTechs] = useState<Set<string>>(new Set());
   const [showCompanies, setShowCompanies] = useState(false);
   const [highlightNode, setHighlightNode] = useState<string | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
+  const toggleFullscreen = useCallback(() => setFullscreen((f) => !f), []);
   const toggleTech = useCallback((techId: string) => {
     setExpandedTechs((prev) => {
       const next = new Set(prev);
@@ -362,10 +88,6 @@ export default function IndustryChainGraph({ data }: Props) {
       return next;
     });
   }, []);
-
-  const handleHighlight = useCallback((nodeId: string | null) => setHighlightNode(nodeId), []);
-
-  const toggleFullscreen = useCallback(() => setFullscreen((f) => !f), []);
 
   useEffect(() => {
     if (!fullscreen) return;
@@ -376,19 +98,152 @@ export default function IndustryChainGraph({ data }: Props) {
     return () => document.removeEventListener("keydown", onKey);
   }, [fullscreen]);
 
-  const nodeCount = useMemo(() => {
-    if (!data) return 0;
-    let count = 1 + data.nodes.filter((n) => n.type === "Technology").length;
-    for (const techId of expandedTechs) {
-      count += data.edges.filter(
-        (e) => e.source === techId && (e.type === "USES_MATERIAL" || e.type === "USES_EQUIPMENT")
-      ).length;
+  // Build parent map for highlighting
+  const parents = useMemo(() => (data ? buildParentMap(data) : new Map()), [data]);
+  const highlightPath = useMemo(
+    () => highlightNode ? getPathToRoot(highlightNode, parents) : null,
+    [highlightNode, parents]
+  );
+
+  // Determine which nodes to show
+  const visibleIds = useMemo(() => {
+    const s = new Set<string>();
+    if (!data) return s;
+    const themeId = data.nodes.find((n) => n.type === "Theme")?.id;
+    if (themeId) s.add(themeId);
+    for (const n of data.nodes) {
+      if (n.type === "Technology") s.add(n.id);
+    }
+    for (const e of data.edges) {
+      if (e.type === "USES_MATERIAL" || e.type === "USES_EQUIPMENT") {
+        if (expandedTechs.has(e.source)) s.add(e.target);
+      }
     }
     if (showCompanies) {
-      count += data.edges.filter((e) => e.type === "EXPOSED_TO").length;
+      for (const e of data.edges) {
+        if (e.type === "EXPOSED_TO") s.add(e.source);
+      }
     }
-    return count;
+    return s;
   }, [data, expandedTechs, showCompanies]);
+
+  // Build Sankey nodes/links
+  const sankeyData = useMemo(() => {
+    if (!data) return { nodes: [] as SankeyDataNode[], links: [] as SankeyDataLink[] };
+
+    const nodes: SankeyDataNode[] = [];
+    const nodeCol: Record<string, number> = {};
+    const nodeIndex: Record<string, number> = {};
+
+    for (const n of data.nodes) {
+      if (!visibleIds.has(n.id)) continue;
+      let col: number;
+      if (n.type === "Theme") col = 0;
+      else if (n.type === "Technology") col = 1;
+      else if (n.type === "Material" || n.type === "Equipment" || n.type === "Product") col = 2;
+      else col = 3; // Company
+
+      nodeIndex[n.id] = nodes.length;
+      nodeCol[n.id] = col;
+      nodes.push({ id: n.id, type: n.type, column: col });
+    }
+
+    const links: SankeyDataLink[] = [];
+    for (const e of data.edges) {
+      if (!visibleIds.has(e.source) || !visibleIds.has(e.target)) continue;
+      const srcCol = nodeCol[e.source] ?? -1;
+      const tgtCol = nodeCol[e.target] ?? -1;
+      // Only include edges going forward (left to right)
+      if (srcCol >= tgtCol) continue;
+      links.push({
+        source: e.source,
+        target: e.target,
+        value: 1,
+        edgeType: e.type || "",
+      });
+    }
+
+    // Sort nodes within each column by type then name
+    nodes.sort((a, b) => {
+      if (a.column !== b.column) return a.column - b.column;
+      const ta = a.type === "Theme" ? 0 : a.type === "Technology" ? 1 : a.type === "Equipment" ? 2 : a.type === "Material" ? 3 : 4;
+      const tb = b.type === "Theme" ? 0 : b.type === "Technology" ? 1 : b.type === "Equipment" ? 2 : b.type === "Material" ? 3 : 4;
+      if (ta !== tb) return ta - tb;
+      return a.id.localeCompare(b.id);
+    });
+
+    return { nodes, links };
+  }, [data, visibleIds]);
+
+  // Compute Sankey layout
+  const layout = useMemo(() => {
+    const { nodes, links } = sankeyData;
+    if (nodes.length === 0) return { nodes: [], links: [] };
+
+    // Assign columns
+    const colCounts = [0, 0, 0, 0];
+    const colAssign: Record<string, number> = {};
+    for (const n of nodes) {
+      const col = n.column;
+      n.column = col;
+      colAssign[n.id] = col;
+      colCounts[col]++;
+    }
+
+    // Map links to indices
+    const idxMap = new Map<string, number>();
+    nodes.forEach((n, i) => idxMap.set(n.id, i));
+
+    const sankeyLinks: { source: number; target: number; value: number }[] = [];
+    const linkMeta: { edgeType: string }[] = [];
+    for (const l of links) {
+      const si = idxMap.get(l.source);
+      const ti = idxMap.get(l.target);
+      if (si === undefined || ti === undefined) continue;
+      sankeyLinks.push({ source: si, target: ti, value: l.value });
+      linkMeta.push({ edgeType: l.edgeType });
+    }
+
+    const w = Math.max(1200, 300 * 4);
+    const h = Math.max(700, nodes.length * 22);
+    const nodeW = 20;
+
+    const generator = sankey<{ id: string; type: string; column: number }, { source: number; target: number; value: number }>()
+      .nodeWidth(nodeW)
+      .nodePadding(10)
+      .extent([[0, 0], [w, h]])
+      .nodeAlign((node) => colAssign[node.id ?? ""] ?? 0)
+      .iterations(32);
+
+    const result = generator({
+      nodes: nodes.map((n) => ({ ...n })),
+      links: sankeyLinks,
+    });
+
+    return {
+      nodes: result.nodes as (SankeyNode<{ id: string; type: string; column: number }, { source: number; target: number; value: number }> & { id: string; type: string })[],
+      links: result.links.map((l, i) => ({ ...l, edgeType: linkMeta[i]?.edgeType ?? "" })),
+      width: result.width || 960,
+      height: Math.max(600, nodes.length * 28),
+    };
+  }, [sankeyData]);
+
+  const handleNodeClick = useCallback(
+    (nodeId: string) => {
+      const n = sankeyData.nodes.find((n) => n.id === nodeId);
+      if (n?.type === "Technology") {
+        toggleTech(nodeId);
+        setHighlightNode(null);
+      } else {
+        setHighlightNode(highlightNode === nodeId ? null : nodeId);
+      }
+    },
+    [sankeyData, toggleTech, highlightNode]
+  );
+
+  const handleSvgClick = useCallback((e: React.MouseEvent) => {
+    if (e.target === svgRef.current) setHighlightNode(null);
+  }, []);
 
   if (!data || data.nodes.length === 0) {
     return (
@@ -398,35 +253,115 @@ export default function IndustryChainGraph({ data }: Props) {
     );
   }
 
+  const svgHeight = Math.max(layout.height || 600, sankeyData.nodes.length * 24);
+  const svgWidth = layout.width || 1200;
+
   const containerClass = fullscreen
-    ? "fixed inset-0 z-50 bg-white"
+    ? "fixed inset-0 z-50 bg-white flex flex-col"
     : "relative h-96 border rounded-lg overflow-hidden group";
+
+  const svgContent = (
+    <svg
+      ref={svgRef}
+      viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+      className="w-full h-full"
+      onClick={handleSvgClick}
+    >
+      {/* Grid lines */}
+      <defs>
+        {[0, 1, 2, 3].map((col) => {
+          const colNodes = layout.nodes.filter((n) => n.column === col);
+          if (colNodes.length === 0) return null;
+          const x = colNodes[0].x0 ?? (col * svgWidth / 4);
+          return (
+            <pattern key={`bg-${col}`} id={`bg-${col}`} width="1" height="1">
+              <rect x={x} y={0} width={colNodes[0].x1 != null ? colNodes[0].x1 - colNodes[0].x0! : 0} height={svgHeight} fill={col === 0 ? "#fff5f0" : col === 1 ? "#f0f4ff" : col === 2 ? "#fffef0" : "#f0fff8"} opacity={0.4} />
+            </pattern>
+          );
+        })}
+      </defs>
+
+      {/* Links */}
+      {layout.links.map((link, i) => {
+        const isHighlighted =
+          !highlightPath ||
+          (highlightPath.has((link.source as any).id) && highlightPath.has((link.target as any).id));
+        const opacity = !highlightPath || isHighlighted ? 0.45 : 0.04;
+        const width = Math.max(1, link.width ?? 1);
+
+        const path = sankeyLinkHorizontal()(link as any);
+        if (!path) return null;
+
+        return (
+          <path
+            key={i}
+            d={path}
+            fill="none"
+            stroke={NODE_COLORS[(link.target as any).type] || "#94a3b8"}
+            strokeWidth={width}
+            strokeOpacity={opacity}
+            className="transition-all duration-300"
+          />
+        );
+      })}
+
+      {/* Nodes */}
+      {layout.nodes.map((node) => {
+        const x = node.x0 ?? 0;
+        const y = node.y0 ?? 0;
+        const w = (node.x1 ?? 0) - (node.y0 ?? 0) > 0 ? (node.x1 ?? 0) - x : 140;
+        const h = Math.max(20, (node.y1 ?? 0) - y);
+        const isExpanded = node.type === "Technology" && expandedTechs.has(node.id as string);
+        const isClicked = (node.id as string) === highlightNode;
+        const onPath = highlightPath && highlightPath.has(node.id as string);
+        const isHovered = (node.id as string) === hoveredNode;
+        const opacity = !highlightPath || onPath ? 1 : 0.12;
+
+        return (
+          <g
+            key={node.id as string}
+            transform={`translate(${x},${y})`}
+            onClick={() => handleNodeClick(node.id as string)}
+            onMouseEnter={() => setHoveredNode(node.id as string)}
+            onMouseLeave={() => setHoveredNode(null)}
+            style={{ cursor: "pointer", transition: "opacity 0.2s" }}
+            opacity={opacity}
+          >
+            <rect
+              width={Math.max(w, 10)}
+              height={h}
+              rx={4}
+              fill={NODE_COLORS[node.type] || "#ddd"}
+              stroke={isClicked ? "#333" : isHovered ? "#666" : "none"}
+              strokeWidth={isClicked ? 2 : isHovered ? 1.5 : 0}
+            />
+            <text
+              x={w + 4}
+              y={h / 2}
+              dy="0.35em"
+              fontSize={h > 28 ? 11 : 9}
+              fill="#333"
+              fontWeight={node.type === "Theme" ? 700 : 600}
+              textAnchor="start"
+            >
+              {(node.type === "Technology" ? (isExpanded ? "▾ " : "▸ ") : "") +
+                (node.id as string)}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
 
   return (
     <>
       <div className={containerClass}>
-        <ReactFlowProvider>
-          <GraphCanvas
-            data={data}
-            showLabels={showLabels}
-            expandedTechs={expandedTechs}
-            showCompanies={showCompanies}
-            highlightNode={highlightNode}
-            onToggleTech={toggleTech}
-            onHighlight={handleHighlight}
-          />
-        </ReactFlowProvider>
+        <div className={`flex-1 overflow-hidden ${fullscreen ? "" : "h-full"}`}>
+          {svgContent}
+        </div>
 
         {/* Toolbar */}
-        <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap">
-          <button
-            onClick={() => setShowLabels((s) => !s)}
-            className={`bg-white/95 border rounded px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors ${
-              showLabels ? "text-blue-600 border-blue-400 bg-blue-50" : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {showLabels ? "标签 ON" : "标签"}
-          </button>
+        <div className={`absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap ${fullscreen ? "" : ""}`}>
           <button
             onClick={() => setShowCompanies((s) => !s)}
             className={`bg-white/95 border rounded px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors ${
@@ -476,18 +411,18 @@ export default function IndustryChainGraph({ data }: Props) {
           </div>
         </div>
 
-        {/* Node count */}
+        {/* Stats */}
         <div className="absolute top-2 right-2 z-10 bg-white/80 rounded px-2 py-1 text-xs text-gray-400">
-          {nodeCount} 可见 / {data.nodes.length} 总计
+          {sankeyData.nodes.length} 节点 · {sankeyData.links.length} 连线
         </div>
 
         {/* Fullscreen exit */}
         {fullscreen && (
           <button
             onClick={toggleFullscreen}
-            className="absolute top-3 right-3 z-10 bg-white border rounded-lg px-3 py-2 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50"
+            className="absolute top-2 right-16 z-10 bg-white border rounded-lg px-3 py-2 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50"
           >
-            ✕ 退出全屏 (Esc)
+            ✕ 退出 (Esc)
           </button>
         )}
       </div>
