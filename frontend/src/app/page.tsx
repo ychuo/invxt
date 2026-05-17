@@ -48,7 +48,7 @@ export default function HomePage() {
         </div>
 
         <SearchBar onSearch={handleSearch} loading={loading} />
-        <QuickTags onSelect={handleSearch} />
+        <QuickTags onSelect={handleSearch} market={market} />
       </div>
     </main>
   );

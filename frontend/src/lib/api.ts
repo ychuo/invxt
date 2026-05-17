@@ -45,3 +45,11 @@ export async function getGraph(themeName: string): Promise<GraphData> {
 export async function searchEntities(q: string): Promise<{ query: string; results: unknown[] }> {
   return dedupedFetch(`${API_BASE}/search?q=${encodeURIComponent(q)}`);
 }
+
+export async function getTrending(market: string): Promise<{ name: string; reason: string }[]> {
+  try {
+    const res = await dedupedFetch<{ topics: { name: string; reason: string }[] }>(`${API_BASE}/trending?market=${market}`);
+    if (res.topics?.length > 0) return res.topics;
+  } catch {}
+  return [];
+}

@@ -1,6 +1,6 @@
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from backend.api.routes import analyze, theme, company, graph_route, search
+from backend.api.routes import analyze, theme, company, graph_route, search, trending
 from backend.api.ws import analyze_ws
 
 app = FastAPI(title="InvXt", version="0.1.0")
@@ -18,6 +18,7 @@ app.include_router(theme.router, prefix="/api")
 app.include_router(company.router, prefix="/api")
 app.include_router(graph_route.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
+app.include_router(trending.router, prefix="/api")
 
 
 @app.websocket("/ws/analyze/{task_id}")
