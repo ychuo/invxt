@@ -31,7 +31,7 @@ class MappingAgent:
         self._neo4j = neo4j
         self._vector = vector_store
 
-    async def map_companies(self, chain_node: dict) -> list[dict]:
+    async def map_companies(self, chain_node: dict, search_context: str = "") -> list[dict]:
         node_name = chain_node.get("direction", chain_node.get("name", ""))
 
         graph_companies = []
@@ -52,7 +52,7 @@ class MappingAgent:
 知识图谱中已有的关联公司：
 {rag_context}
 
-请映射到相关的A股和美股上市公司。""",
+请映射到相关的A股和美股上市公司。{search_context}""",
             temperature=0.3,
         )
         return result if isinstance(result, list) else []
@@ -63,11 +63,11 @@ class MappingAgent:
             return f"图谱已有：{', '.join(names)}"
         return "图谱中暂无该环节的公司映射"
 
-    async def map_all(self, chain_results: list[dict]) -> list[dict]:
+    async def map_all(self, chain_results: list[dict], search_context: str = "") -> list[dict]:
         all_companies = []
         seen = set()
         for chain_node in chain_results:
-            companies = await self.map_companies(chain_node)
+            companies = await self.map_companies(chain_node, search_context)
             for c in companies:
                 key = c.get("ticker", c.get("company_name", ""))
                 if key and key not in seen:

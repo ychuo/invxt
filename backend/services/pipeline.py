@@ -30,6 +30,7 @@ class AnalysisState:
     chain_results: list[dict] = field(default_factory=list)
     company_results: list[dict] = field(default_factory=list)
     scored_results: list[dict] = field(default_factory=list)
+    search_results: list[dict] = field(default_factory=list)
     current_step: str = ""
     error: str | None = None
 
@@ -44,6 +45,7 @@ class AnalysisState:
             "chain": self.chain_results,
             "companies": self.company_results,
             "scored": self.scored_results,
+            "search": self.search_results,
             "error": self.error,
         }
 
@@ -84,20 +86,31 @@ class AnalysisPipeline:
         # Step 0: Real-time search for latest news/context
         state.current_step = "search"
         await self._emit(state)
-        search_results: list[dict] = []
         try:
             from backend.services.search_client import SearchClient
             sc = SearchClient()
-            search_results = await sc.search(f"{topic} 最新进展 产业链 核心公司 受益标的", max_results=6)
+            state.search_results = await sc.search(f"{topic} 最新进展 产业链 核心公司 受益标的", max_results=6)
         except Exception:
             pass
+        state.current_step = "search_completed"
+        await self._emit(state)
+
+        # Build search context string for downstream agents
+        search_context = ""
+        if state.search_results:
+            snippets = "\n".join(
+                f"- [{r.get('title', '')}] {r.get('content', '')[:300]}"
+                for r in state.search_results[:5] if r.get("content")
+            )
+            if snippets:
+                search_context = f"\n\n📰 最新搜索信息（参考以下实时信息辅助判断）：\n{snippets}"
 
         # Step 1: Theme understanding (with search context)
         state.status = StepStatus.RUNNING
         state.current_step = "theme_understanding"
         await self._emit(state)
         try:
-            state.theme_result = await self._theme_agent.analyze(topic, search_results)
+            state.theme_result = await self._theme_agent.analyze(topic, state.search_results)
             state.current_step = "theme_understanding_completed"
             await self._emit(state)
         except Exception as e:
@@ -111,7 +124,7 @@ class AnalysisPipeline:
         await self._emit(state)
         try:
             directions = state.theme_result.get("directions", [])
-            state.chain_results = await self._chain_agent.analyze_all(directions)
+            state.chain_results = await self._chain_agent.analyze_all(directions, search_context)
             state.current_step = "chain_reasoning_completed"
             await self._emit(state)
         except Exception as e:
@@ -150,7 +163,7 @@ class AnalysisPipeline:
             for chain in state.chain_results:
                 tech_name = chain.get("direction", "")
                 if tech_name:
-                    companies = await self._mapping_agent.map_companies(chain)
+                    companies = await self._mapping_agent.map_companies(chain, search_context)
                     tech_companies[tech_name] = companies
 
             # Flatten for scoring (deduplicate by ticker)

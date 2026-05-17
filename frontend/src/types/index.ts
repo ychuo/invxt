@@ -45,6 +45,12 @@ export interface ScoredCompany {
   risks: string[];
 }
 
+export interface SearchResult {
+  title: string;
+  url: string;
+  content: string;
+}
+
 export interface AnalysisState {
   task_id: string;
   topic: string;
@@ -55,6 +61,7 @@ export interface AnalysisState {
   chain: ChainResult[];
   companies: CompanyMapping[];
   scored: ScoredCompany[];
+  search: SearchResult[];
   error: string | null;
 }
 

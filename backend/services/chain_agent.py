@@ -30,7 +30,7 @@ class ChainAgent:
         self._neo4j = neo4j
         self._vector = vector_store
 
-    async def analyze_direction(self, direction: dict) -> dict:
+    async def analyze_direction(self, direction: dict, search_context: str = "") -> dict:
         direction_name = direction["name"]
         graph_results = self._neo4j.find_entity(direction_name)
         rag_context = self._build_rag_context(direction_name, graph_results)
@@ -42,7 +42,7 @@ class ChainAgent:
 知识图谱参考数据：
 {rag_context}
 
-请拆解这个方向的完整产业链。"""
+请拆解这个方向的完整产业链。{search_context}"""
 
         result = await self._llm.chat_with_json(
             system_prompt=SYSTEM_PROMPT,
@@ -57,9 +57,9 @@ class ChainAgent:
             parts.append(f"Properties: {json.dumps(graph_result, ensure_ascii=False)}")
         return "\n".join(parts)
 
-    async def analyze_all(self, directions: list[dict]) -> list[dict]:
+    async def analyze_all(self, directions: list[dict], search_context: str = "") -> list[dict]:
         results = []
         for d in directions:
-            result = await self.analyze_direction(d)
+            result = await self.analyze_direction(d, search_context)
             results.append(result)
         return results

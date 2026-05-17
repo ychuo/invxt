@@ -130,6 +130,22 @@ export default function AnalysisPage() {
       {/* Show results progressively as each step completes */}
       {state && (
         <div>
+          {/* Step 0: Real-time search results */}
+          {state.search && state.search.length > 0 && (
+            <section className="mb-8">
+              <h3 className="text-lg font-semibold mb-3">🔍 实时搜索</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {state.search.map((r, i) => (
+                  <a key={i} href={r.url} target="_blank" rel="noopener noreferrer"
+                     className="block border rounded-lg p-3 text-sm hover:bg-gray-50 transition-colors no-underline text-inherit">
+                    <h4 className="font-medium text-blue-700 mb-1 line-clamp-1">{r.title}</h4>
+                    <p className="text-gray-500 text-xs line-clamp-3">{r.content}</p>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Step 1 done: Theme summary */}
           {state.theme && (
             <section className="mb-8">
