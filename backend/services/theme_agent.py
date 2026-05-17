@@ -29,9 +29,18 @@ class ThemeAgent:
     def __init__(self, llm: LLMClient):
         self._llm = llm
 
-    async def analyze(self, topic: str) -> dict:
+    async def analyze(self, topic: str, search_results: list[dict] | None = None) -> dict:
+        search_context = ""
+        if search_results:
+            snippets = "\n".join(
+                f"- [{r.get('title', '')}] {r.get('content', '')[:200]}"
+                for r in search_results[:5] if r.get("content")
+            )
+            if snippets:
+                search_context = f"\n\n最新实时搜索信息（结合以下信息辅助判断）：\n{snippets}"
+
         return await self._llm.chat_with_json(
             system_prompt=SYSTEM_PROMPT,
-            user_message=f"请分析以下投资主题：{topic}",
+            user_message=f"请分析以下投资主题：{topic}{search_context}",
             temperature=0.3,
         )

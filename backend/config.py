@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.deepseek.com"
     llm_model: str = "deepseek-v4-flash"
 
+    tavily_api_key: str = ""
+
     embedding_model: str = "BAAI/bge-m3"
 
     class Config:

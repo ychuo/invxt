@@ -81,12 +81,23 @@ class AnalysisPipeline:
         except Exception:
             pass
 
-        # Step 1: Theme understanding
+        # Step 0: Real-time search for latest news/context
+        state.current_step = "search"
+        await self._emit(state)
+        search_results: list[dict] = []
+        try:
+            from backend.services.search_client import SearchClient
+            sc = SearchClient()
+            search_results = await sc.search(f"{topic} 最新进展 产业链 核心公司 受益标的", max_results=6)
+        except Exception:
+            pass
+
+        # Step 1: Theme understanding (with search context)
         state.status = StepStatus.RUNNING
         state.current_step = "theme_understanding"
         await self._emit(state)
         try:
-            state.theme_result = await self._theme_agent.analyze(topic)
+            state.theme_result = await self._theme_agent.analyze(topic, search_results)
             state.current_step = "theme_understanding_completed"
             await self._emit(state)
         except Exception as e:
