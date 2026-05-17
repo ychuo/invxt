@@ -19,7 +19,7 @@ export default function HomePage() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center px-4 py-16">
       <div className="w-full max-w-2xl">
-        <h1 className="text-4xl font-bold mb-2">Invxt</h1>
+        <h1 className="text-4xl font-bold mb-2">InvXt</h1>
         <p className="text-gray-500 text-lg mb-8">
           产业链智能分析 · 主题 → 公司映射
         </p>

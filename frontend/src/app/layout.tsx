@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Invxt — 主题投资分析",
+  title: "InvXt — 主题投资分析",
   description: "AI 驱动的产业链推理与投资主题映射",
 };
 

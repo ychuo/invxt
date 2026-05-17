@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.api.routes import analyze, theme, company, graph_route, search
 from backend.api.ws import analyze_ws
 
-app = FastAPI(title="Invxt", version="0.1.0")
+app = FastAPI(title="InvXt", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,

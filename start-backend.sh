@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start Invxt backend server
+# Start InvXt backend server
 cd "$(dirname "$0")"
 lsof -ti:8000 | xargs kill -9 2>/dev/null
 sleep 1

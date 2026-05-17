@@ -106,7 +106,7 @@ export default function AnalysisPage() {
 
   return (
     <main className="min-h-screen max-w-5xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-1">Invxt</h1>
+      <h1 className="text-3xl font-bold mb-1">InvXt</h1>
       <p className="text-gray-500 mb-6">
         主题 &ldquo;{topic}&rdquo; ·{" "}
         {market === "A" ? "A股" : market === "US" ? "美股" : "全部"}
