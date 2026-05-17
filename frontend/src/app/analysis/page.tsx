@@ -143,7 +143,7 @@ export default function AnalysisPage() {
               <h3 className="text-lg font-semibold mb-3">产业链推理</h3>
               <div className="flex items-center gap-2 text-sm text-gray-400">
                 <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full" />
-                DeepSeek 正在拆解产业链结构...
+                大模型正在拆解产业链结构...
               </div>
             </section>
           )}
@@ -162,7 +162,7 @@ export default function AnalysisPage() {
               <h3 className="text-lg font-semibold mb-3">公司映射</h3>
               <div className="flex items-center gap-2 text-sm text-gray-400">
                 <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full" />
-                DeepSeek 正在映射产业链核心公司...
+                大模型正在映射产业链核心公司...
               </div>
             </section>
           )}

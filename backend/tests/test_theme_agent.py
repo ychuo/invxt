@@ -6,8 +6,8 @@ from backend.services.theme_agent import ThemeAgent
 
 @pytest.mark.asyncio
 async def test_theme_analysis():
-    if not os.environ.get("DEEPSEEK_API_KEY"):
-        pytest.skip("DEEPSEEK_API_KEY not set")
+    if not os.environ.get("LLM_API_KEY"):
+        pytest.skip("LLM_API_KEY not set")
     llm = LLMClient()
     agent = ThemeAgent(llm)
     result = await agent.analyze("HBM")

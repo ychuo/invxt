@@ -5,8 +5,8 @@ from backend.services.llm_client import LLMClient
 
 @pytest.mark.asyncio
 async def test_chat_simple():
-    if not os.environ.get("DEEPSEEK_API_KEY"):
-        pytest.skip("DEEPSEEK_API_KEY not set")
+    if not os.environ.get("LLM_API_KEY"):
+        pytest.skip("LLM_API_KEY not set")
     client = LLMClient()
     response = await client.chat(
         system_prompt="You are a helpful assistant. Reply in JSON.",
@@ -18,8 +18,8 @@ async def test_chat_simple():
 
 @pytest.mark.asyncio
 async def test_chat_with_json():
-    if not os.environ.get("DEEPSEEK_API_KEY"):
-        pytest.skip("DEEPSEEK_API_KEY not set")
+    if not os.environ.get("LLM_API_KEY"):
+        pytest.skip("LLM_API_KEY not set")
     client = LLMClient()
     result = await client.chat_with_json(
         system_prompt="Reply with valid JSON only. No markdown.",

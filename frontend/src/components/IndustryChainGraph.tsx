@@ -172,7 +172,7 @@ export default function IndustryChainGraph({ data }: Props) {
       <div className={`flex-1 overflow-hidden ${fullscreen?"":"h-full"}`}>
         <div ref={containerRef} className="w-full h-full overflow-hidden cursor-grab active:cursor-grabbing select-none" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
           <div style={{transform:`translate(${pan.x}px,${pan.y}px) scale(${zoom})`,transformOrigin:"0 0"}}>
-            <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{width:svgW,height:svgH,minWidth:svgW}} onClick={()=>setHighlightNode(null)}>
+            <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{width:svgW,height:svgH,minWidth:svgW}}>
               {layout.links.map((link,i)=>{
                 const sid=(link.source as any).id||(link.source as any).name||"",tid=(link.target as any).id||(link.target as any).name||"";
                 const on=!highlightSet||(highlightSet.has(sid)&&highlightSet.has(tid));

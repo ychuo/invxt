@@ -9,9 +9,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://invxt:password@localhost:5432/invxt"
     redis_url: str = "redis://localhost:6379"
 
-    deepseek_api_key: str = ""
-    deepseek_base_url: str = "https://api.deepseek.com"
-    deepseek_model: str = "deepseek-chat"
+    llm_api_key: str = ""
+    llm_base_url: str = "https://api.deepseek.com"
+    llm_model: str = "deepseek-chat"
 
     embedding_model: str = "BAAI/bge-m3"
 

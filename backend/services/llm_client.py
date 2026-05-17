@@ -5,9 +5,9 @@ from backend.config import settings
 
 class LLMClient:
     def __init__(self):
-        self._api_key = settings.deepseek_api_key
-        self._base_url = settings.deepseek_base_url.rstrip("/")
-        self._model = settings.deepseek_model
+        self._api_key = settings.llm_api_key
+        self._base_url = settings.llm_base_url.rstrip("/")
+        self._model = settings.llm_model
 
     async def chat(
         self,

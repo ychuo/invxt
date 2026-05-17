@@ -8,8 +8,8 @@ from backend.kg.vector_store import VectorStore
 
 @pytest.mark.asyncio
 async def test_company_mapping():
-    if not os.environ.get("DEEPSEEK_API_KEY"):
-        pytest.skip("DEEPSEEK_API_KEY not set")
+    if not os.environ.get("LLM_API_KEY"):
+        pytest.skip("LLM_API_KEY not set")
     llm = LLMClient()
     neo4j = Neo4jClient()
     vector = VectorStore()

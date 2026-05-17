@@ -7,8 +7,8 @@ from backend.kg.neo4j_client import Neo4jClient
 
 @pytest.mark.asyncio
 async def test_scoring():
-    if not os.environ.get("DEEPSEEK_API_KEY"):
-        pytest.skip("DEEPSEEK_API_KEY not set")
+    if not os.environ.get("LLM_API_KEY"):
+        pytest.skip("LLM_API_KEY not set")
     llm = LLMClient()
     neo4j = Neo4jClient()
     agent = ScoringAgent(llm, neo4j)

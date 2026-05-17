@@ -1,6 +1,6 @@
 """
 Seed the knowledge graph with initial industry chain relationships.
-Uses DeepSeek to batch-generate common theme -> technology -> material/equipment chains,
+Uses LLM to batch-generate common theme -> technology -> material/equipment chains,
 then populates Neo4j.
 """
 import json

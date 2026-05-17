@@ -5,8 +5,8 @@ from backend.services.pipeline import AnalysisPipeline, StepStatus
 
 @pytest.mark.asyncio
 async def test_pipeline_integration():
-    if not os.environ.get("DEEPSEEK_API_KEY"):
-        pytest.skip("DEEPSEEK_API_KEY not set")
+    if not os.environ.get("LLM_API_KEY"):
+        pytest.skip("LLM_API_KEY not set")
     pipeline = AnalysisPipeline()
     state = await pipeline.run("HBM", market="A")
 
