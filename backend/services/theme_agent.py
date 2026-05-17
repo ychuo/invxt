@@ -1,3 +1,4 @@
+from __future__ import annotations
 from backend.services.llm_client import LLMClient
 
 SYSTEM_PROMPT = """你是一个产业投资主题分析专家。给定一个主题词，你需要：
