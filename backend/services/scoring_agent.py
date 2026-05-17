@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 from backend.services.llm_client import LLMClient
 from backend.kg.neo4j_client import Neo4jClient
@@ -89,9 +90,17 @@ class ScoringAgent:
         self._llm = llm
         self._neo4j = neo4j
 
-    async def score(self, theme_name: str, companies: list[dict]) -> list[dict]:
+    async def score(
+        self,
+        theme_name: str,
+        companies: list[dict],
+        signals: dict[str, dict[str, float | None]] | None = None,
+    ) -> list[dict]:
         if not companies:
             return []
+
+        from backend.services.market_signal import format_signals_for_prompt
+        signal_context = format_signals_for_prompt(companies, signals or {})
 
         result = await self._llm.chat_with_json(
             system_prompt=SYSTEM_PROMPT,
@@ -100,7 +109,9 @@ class ScoringAgent:
 公司列表（无特定顺序）：
 {json.dumps(companies, ensure_ascii=False, indent=2)}
 
-请提取每家公司的结构化信息。""",
+{signal_context}
+
+请提取每家公司的结构化信息。注意：market_awareness 的判断需结合上述量价信号——涨幅大+换手高+RSI高通常意味着已定价；涨幅小+换手低通常意味着认知不足。""",
             temperature=0,
             max_tokens=16384,
         )

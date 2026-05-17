@@ -195,12 +195,19 @@ class AnalysisPipeline:
             await self._emit(state)
             return state
 
-        # Step 4: Scoring
+        # Step 4: Scoring (with market signals)
         state.current_step = "scoring"
         await self._emit(state)
         display_name = state.theme_result.get("theme_name", topic)
         try:
-            state.scored_results = await self._scoring_agent.score(display_name, state.company_results)
+            from backend.services.market_signal import get_signals_for_companies
+            signals = await get_signals_for_companies(state.company_results)
+        except Exception:
+            signals = {}
+        try:
+            state.scored_results = await self._scoring_agent.score(
+                display_name, state.company_results, signals
+            )
             try:
                 self._scoring_agent.write_to_graph(topic, state.scored_results)
             except Exception:
