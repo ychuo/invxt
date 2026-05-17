@@ -72,6 +72,15 @@ class AnalysisPipeline:
     async def run(self, topic: str, market: str = "A") -> AnalysisState:
         state = AnalysisState(task_id=str(uuid.uuid4()), topic=topic, market=market)
 
+        # Clean old graph data for this topic BEFORE building new structure
+        try:
+            with self._neo4j.driver.session() as session:
+                session.run("MATCH (th:Theme {name: $name})-[r:REQUIRES]->() DELETE r", name=topic)
+                session.run("MATCH ()-[r:EXPOSED_TO]->(th:Theme {name: $name}) DELETE r", name=topic)
+                session.run("MATCH ()-[r:SUPPLIES]->(t:Technology) WHERE EXISTS((:Theme {name: $name})-[:REQUIRES]->(t)) DELETE r", name=topic)
+        except Exception:
+            pass
+
         # Step 1: Theme understanding
         state.status = StepStatus.RUNNING
         state.current_step = "theme_understanding"
@@ -156,21 +165,6 @@ class AnalysisPipeline:
             state.error = f"Company mapping failed: {type(e).__name__}: {e}"
             await self._emit(state)
             return state
-
-        # Clean old data for this theme before writing new
-        try:
-            with self._neo4j.driver.session() as session:
-                session.run(
-                    "MATCH (th:Theme {name: $name})-[r:REQUIRES]->() DELETE r", name=topic
-                )
-                session.run(
-                    "MATCH ()-[r:EXPOSED_TO]->(th:Theme {name: $name}) DELETE r", name=topic
-                )
-                session.run(
-                    "MATCH ()-[r:SUPPLIES]->(t:Technology) WHERE EXISTS((:Theme {name: $name})-[:REQUIRES]->(t)) DELETE r", name=topic
-                )
-        except Exception:
-            pass
 
         # Step 4: Scoring
         state.current_step = "scoring"
