@@ -124,12 +124,17 @@ class AnalysisPipeline:
             await self._emit(state)
             return state
 
-        # Step 2: Chain reasoning
+        # Step 2: Chain reasoning (with industry news)
         state.current_step = "chain_reasoning"
         await self._emit(state)
         try:
+            from backend.services.news_service import NewsService
+            ns = NewsService()
             directions = state.theme_result.get("directions", [])
-            state.chain_results = await self._chain_agent.analyze_all(directions, search_context)
+            news_tasks = [ns.get_industry_news(d.get("name", "")) for d in directions]
+            news_contexts = await asyncio.gather(*news_tasks, return_exceptions=True)
+            news_contexts = [nc if isinstance(nc, str) else "" for nc in news_contexts]
+            state.chain_results = await self._chain_agent.analyze_all(directions, search_context, news_contexts)
             state.current_step = "chain_reasoning_completed"
             await self._emit(state)
         except Exception as e:
@@ -159,16 +164,18 @@ class AnalysisPipeline:
         except Exception:
             pass
 
-        # Step 3: Company mapping (keep per-tech grouping for SUPPLIES edges)
+        # Step 3: Company mapping (with company news per tech direction)
         state.current_step = "company_mapping"
         await self._emit(state)
-        # Map: tech_name -> [companies]
+        from backend.services.news_service import NewsService
+        ns = NewsService()
         tech_companies: dict[str, list[dict]] = {}
         try:
             for chain in state.chain_results:
                 tech_name = chain.get("direction", "")
                 if tech_name:
-                    companies = await self._mapping_agent.map_companies(chain, search_context)
+                    tech_news = await ns.get_industry_news(tech_name)
+                    companies = await self._mapping_agent.map_companies(chain, search_context, tech_news)
                     tech_companies[tech_name] = companies
 
             # Flatten for scoring (deduplicate by ticker)
@@ -195,7 +202,7 @@ class AnalysisPipeline:
             await self._emit(state)
             return state
 
-        # Step 4: Scoring (with market signals)
+        # Step 4: Scoring (with fundamentals + signals)
         state.current_step = "scoring"
         await self._emit(state)
         display_name = state.theme_result.get("theme_name", topic)
@@ -205,8 +212,20 @@ class AnalysisPipeline:
         except Exception:
             signals = {}
         try:
+            from backend.services.fundamental_service import get_revenue_composition
+            fundamentals: dict[str, dict[str, float] | None] = {}
+            for c in state.company_results:
+                ticker = c.get("ticker", "")
+                market = c.get("market", "")
+                if ticker:
+                    comp = await get_revenue_composition(ticker, market)
+                    if comp:
+                        fundamentals[ticker] = comp
+        except Exception:
+            fundamentals = {}
+        try:
             state.scored_results = await self._scoring_agent.score(
-                display_name, state.company_results, signals
+                display_name, state.company_results, signals, fundamentals
             )
             try:
                 self._scoring_agent.write_to_graph(topic, state.scored_results)

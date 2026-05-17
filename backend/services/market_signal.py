@@ -72,11 +72,33 @@ async def _fetch_a_share(
             # rsi_14
             rsi = _calc_rsi(close, 14)
 
+            fund_flow = None
+            try:
+                ff_df = ak.stock_individual_fund_flow_rank()
+                if ff_df is not None and "代码" in ff_df.columns:
+                    row = ff_df[ff_df["代码"] == ticker]
+                    if len(row) > 0:
+                        net_flow = row.iloc[0].get("主力净流入", row.iloc[0].get("主力净流入额"))
+                        if net_flow is not None:
+                            fund_flow = round(float(net_flow) / 1e8, 2)
+            except Exception:
+                pass
+
+            north_bound = None
+            try:
+                hsgt_df = ak.stock_hsgt_individual_detail_em(symbol=ticker)
+                if hsgt_df is not None and len(hsgt_df) > 0 and "净买入" in hsgt_df.columns:
+                    north_bound = round(float(hsgt_df.head(5)["净买入"].sum()) / 1e8, 2)
+            except Exception:
+                pass
+
             results[ticker] = {
                 "return_1m": round(ret_1m, 1),
                 "turnover_pct": turnover_pct,
                 "volume_ratio": vol_ratio,
                 "rsi_14": rsi,
+                "fund_flow": fund_flow,
+                "north_bound": north_bound,
             }
         except Exception:
             continue
@@ -107,11 +129,21 @@ async def _fetch_us(
 
             rsi = _calc_rsi(close, 14)
 
+            inst_holding = None
+            try:
+                holders = stock.institutional_holders
+                if holders is not None and len(holders) > 0 and "% Out" in holders.columns:
+                    inst_holding = round(float(holders.iloc[:10]["% Out"].sum()), 1)
+            except Exception:
+                pass
+
             results[ticker] = {
                 "return_1m": round(ret_1m, 1),
                 "turnover_pct": None,  # yfinance no turnover data
                 "volume_ratio": vol_ratio,
                 "rsi_14": rsi,
+                "fund_flow": inst_holding,
+                "north_bound": None,
             }
         except Exception:
             continue
@@ -157,6 +189,10 @@ def format_signals_for_prompt(
             parts.append(f"量比 {s['volume_ratio']}x")
         if s.get("rsi_14") is not None:
             parts.append(f"RSI-14 {s['rsi_14']}")
+        if s.get("fund_flow") is not None:
+            parts.append(f"主力净流入 {s['fund_flow']:+.2f}亿")
+        if s.get("north_bound") is not None:
+            parts.append(f"北向净买 {s['north_bound']:+.2f}亿")
         lines.append("- " + " ".join(parts))
 
     return "\n".join(lines)

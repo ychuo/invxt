@@ -45,7 +45,7 @@ class MappingAgent:
         self._neo4j = neo4j
         self._vector = vector_store
 
-    async def map_companies(self, chain_node: dict, search_context: str = "") -> list[dict]:
+    async def map_companies(self, chain_node: dict, search_context: str = "", news_context: str = "") -> list[dict]:
         node_name = chain_node.get("direction", chain_node.get("name", ""))
 
         graph_companies = []
@@ -66,7 +66,7 @@ class MappingAgent:
 知识图谱中已有的关联公司：
 {rag_context}
 
-请映射到相关的A股和美股上市公司。{search_context}""",
+请映射到相关的A股和美股上市公司。{search_context}{news_context}""",
             temperature=0.3,
         )
         companies = result if isinstance(result, list) else []

@@ -95,12 +95,15 @@ class ScoringAgent:
         theme_name: str,
         companies: list[dict],
         signals: dict[str, dict[str, float | None]] | None = None,
+        fundamentals: dict[str, dict[str, float] | None] | None = None,
     ) -> list[dict]:
         if not companies:
             return []
 
         from backend.services.market_signal import format_signals_for_prompt
+        from backend.services.fundamental_service import format_fundamentals_for_prompt
         signal_context = format_signals_for_prompt(companies, signals or {})
+        fundamental_context = format_fundamentals_for_prompt(companies, fundamentals or {})
 
         result = await self._llm.chat_with_json(
             system_prompt=SYSTEM_PROMPT,
@@ -109,9 +112,11 @@ class ScoringAgent:
 公司列表（无特定顺序）：
 {json.dumps(companies, ensure_ascii=False, indent=2)}
 
+{fundamental_context}
+
 {signal_context}
 
-请提取每家公司的结构化信息。注意：market_awareness 的判断需结合上述量价信号——涨幅大+换手高+RSI高通常意味着已定价；涨幅小+换手低通常意味着认知不足。""",
+请提取每家公司的结构化信息。注意：revenue_tier 的判断需结合上述真实营收构成数据（如果有）；market_awareness 的判断需结合上述量价信号——涨幅大+换手高+RSI高通常意味着已定价；涨幅小+换手低+主力流入通常意味着认知不足。""",
             temperature=0,
             max_tokens=16384,
         )
