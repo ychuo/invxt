@@ -70,9 +70,10 @@ async def get_revenue_composition(ticker: str, market: str) -> dict[str, float] 
 async def _fetch_a_share_revenue(ticker: str) -> dict[str, float] | None:
     import akshare as ak
 
-    # Determine market prefix: 6xxxxx -> SH, everything else in A market -> SZ
-    prefix = "SH" if ticker.startswith("6") else "SZ"
-    symbol = f"{prefix}{ticker}"
+    # Strip exchange suffix: "600584.SH" → "600584"
+    clean = ticker.split(".")[0] if "." in ticker else ticker
+    prefix = "SH" if clean.startswith("6") else "SZ"
+    symbol = f"{prefix}{clean}"
 
     try:
         df = ak.stock_zygc_em(symbol=symbol)

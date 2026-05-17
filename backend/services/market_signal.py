@@ -32,10 +32,20 @@ async def _fetch_a_share(
     import akshare as ak
 
     results: dict[str, dict[str, float | None]] = {}
+
+    # Fetch fund flow rank ONCE for all tickers (returns entire market)
+    ff_df = None
+    try:
+        ff_df = ak.stock_individual_fund_flow_rank()
+    except Exception:
+        pass
+
     for ticker in tickers:
+        # Strip exchange suffix for matching: "600584.SH" → "600584"
+        clean_ticker = ticker.split(".")[0] if "." in ticker else ticker
         try:
             df = ak.stock_zh_a_hist(
-                symbol=ticker,
+                symbol=clean_ticker,
                 period="daily",
                 start_date="20250101",
                 end_date="20991231",
@@ -73,20 +83,16 @@ async def _fetch_a_share(
             rsi = _calc_rsi(close, 14)
 
             fund_flow = None
-            try:
-                ff_df = ak.stock_individual_fund_flow_rank()
-                if ff_df is not None and "代码" in ff_df.columns:
-                    row = ff_df[ff_df["代码"] == ticker]
-                    if len(row) > 0:
-                        net_flow = row.iloc[0].get("主力净流入", row.iloc[0].get("主力净流入额"))
-                        if net_flow is not None:
-                            fund_flow = round(float(net_flow) / 1e8, 2)
-            except Exception:
-                pass
+            if ff_df is not None and "代码" in ff_df.columns:
+                row = ff_df[ff_df["代码"] == clean_ticker]
+                if len(row) > 0:
+                    net_flow = row.iloc[0].get("主力净流入", row.iloc[0].get("主力净流入额"))
+                    if net_flow is not None:
+                        fund_flow = round(float(net_flow) / 1e8, 2)
 
             north_bound = None
             try:
-                hsgt_df = ak.stock_hsgt_individual_detail_em(symbol=ticker)
+                hsgt_df = ak.stock_hsgt_individual_detail_em(symbol=clean_ticker)
                 if hsgt_df is not None and len(hsgt_df) > 0 and "净买入" in hsgt_df.columns:
                     north_bound = round(float(hsgt_df.head(5)["净买入"].sum()) / 1e8, 2)
             except Exception:
