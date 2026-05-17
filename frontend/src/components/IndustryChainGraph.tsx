@@ -130,7 +130,7 @@ export default function IndustryChainGraph({ data }: Props) {
   // Wheel zoom (handles scroll + Mac trackpad pinch via ctrlKey)
   useEffect(() => {
     const el=containerRef.current; if(!el)return;
-    const onWheel=(e:WheelEvent)=>{e.preventDefault();const f=e.ctrlKey?Math.exp(-e.deltaY/50):(e.deltaY>0?0.9:1.1);setZoom((z)=>Math.min(5,Math.max(0.1,z*f)));};
+    const onWheel=(e:WheelEvent)=>{e.preventDefault();const f=e.ctrlKey?(e.deltaY>0?0.93:1.07):(e.deltaY>0?0.9:1.1);setZoom((z)=>Math.min(5,Math.max(0.1,z*f)));};
     el.addEventListener("wheel",onWheel,{passive:false});
     return ()=>el.removeEventListener("wheel",onWheel);
   }, []);
