@@ -33,13 +33,6 @@ async def _fetch_a_share(
 
     results: dict[str, dict[str, float | None]] = {}
 
-    # Fetch fund flow rank ONCE for all tickers (returns entire market)
-    ff_df = None
-    try:
-        ff_df = ak.stock_individual_fund_flow_rank()
-    except Exception:
-        pass
-
     for ticker in tickers:
         # Strip exchange suffix for matching: "600584.SH" → "600584"
         clean_ticker = ticker.split(".")[0] if "." in ticker else ticker
@@ -83,18 +76,21 @@ async def _fetch_a_share(
             rsi = _calc_rsi(close, 14)
 
             fund_flow = None
-            if ff_df is not None and "代码" in ff_df.columns:
-                row = ff_df[ff_df["代码"] == clean_ticker]
-                if len(row) > 0:
-                    net_flow = row.iloc[0].get("主力净流入", row.iloc[0].get("主力净流入额"))
+            try:
+                mkt = "sh" if clean_ticker.startswith("6") else "sz"
+                ff_df = ak.stock_individual_fund_flow(stock=clean_ticker, market=mkt)
+                if ff_df is not None and len(ff_df) > 0:
+                    net_flow = ff_df.iloc[0].get("主力净流入-净额")
                     if net_flow is not None:
                         fund_flow = round(float(net_flow) / 1e8, 2)
+            except Exception:
+                pass
 
             north_bound = None
             try:
-                hsgt_df = ak.stock_hsgt_individual_detail_em(symbol=clean_ticker)
-                if hsgt_df is not None and len(hsgt_df) > 0 and "净买入" in hsgt_df.columns:
-                    north_bound = round(float(hsgt_df.head(5)["净买入"].sum()) / 1e8, 2)
+                hsgt_df = ak.stock_hsgt_individual_em(symbol=clean_ticker)
+                if hsgt_df is not None and len(hsgt_df) >= 5 and "今日增持资金" in hsgt_df.columns:
+                    north_bound = round(float(hsgt_df.tail(5)["今日增持资金"].sum()) / 1e8, 2)
             except Exception:
                 pass
 
