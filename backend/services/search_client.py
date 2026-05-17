@@ -7,7 +7,7 @@ class SearchClient:
     def __init__(self):
         self._client = TavilyClient(settings.tavily_api_key) if settings.tavily_api_key else None
 
-    async def search(self, query: str, max_results: int = 5, time_range: str = "month") -> list[dict]:
+    async def search(self, query: str, max_results: int = 10) -> list[dict]:
         """Search for recent news/articles. Returns list of {title, url, content}."""
         if not self._client or not query:
             return []
@@ -16,7 +16,6 @@ class SearchClient:
                 query=query,
                 search_depth="advanced",
                 max_results=max_results,
-                time_range=time_range,
                 include_raw_content=False,
                 include_answer=False,
             )
