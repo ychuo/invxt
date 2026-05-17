@@ -2,6 +2,7 @@ from __future__ import annotations
 import uuid
 import asyncio
 from dataclasses import dataclass, field
+from datetime import date
 from enum import Enum
 from backend.services.llm_client import LLMClient
 from backend.services.theme_agent import ThemeAgent
@@ -90,8 +91,9 @@ class AnalysisPipeline:
             from backend.services.search_client import SearchClient
             sc = SearchClient()
             market_label = {"A": "A股", "US": "美股", "all": "A股 美股"}.get(market, "A股 美股")
+            today = date.today().strftime("%Y年%m月%d日")
             state.search_results = await sc.search(
-                f"{topic} 最新进展 {market_label} 上市公司 产业链 核心标的 受益公司", max_results=10
+                f"{topic} 最新进展 {market_label} 上市公司 产业链 核心标的 受益公司 (当前日期: {today})", max_results=10
             )
         except Exception:
             pass
