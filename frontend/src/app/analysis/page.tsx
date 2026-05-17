@@ -112,15 +112,13 @@ export default function AnalysisPage() {
         {market === "A" ? "A股" : market === "US" ? "美股" : "全部"}
       </p>
 
-      {loading && !state && (
+      {state && <ProgressStepper currentStep={state.current_step} />}
+
+      {loading && !state && !error && (
         <div className="flex items-center gap-3 text-gray-500">
           <div className="animate-spin w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full" />
           正在分析...
         </div>
-      )}
-
-      {loading && state && (
-        <ProgressStepper currentStep={state.current_step} />
       )}
 
       {error && (
@@ -129,35 +127,94 @@ export default function AnalysisPage() {
         </div>
       )}
 
-      {state && state.status === "completed" && (
+      {/* Show results progressively as each step completes */}
+      {state && (
         <div>
-          <ProgressStepper currentStep={state.current_step} />
-
           {state.theme && (
             <section className="mb-8">
               <ThemeSummary theme={state.theme} />
             </section>
           )}
 
-          <section className="mb-8">
-            <h3 className="text-lg font-semibold mb-3">产业链图谱</h3>
-            <IndustryChainGraph data={graphData} />
-          </section>
-
-          {state.scored.length > 0 && (
+          {state.current_step.startsWith("chain_reasoning") && (
             <section className="mb-8">
-              <h3 className="text-lg font-semibold mb-3">
-                核心公司映射 ({state.scored.length})
-              </h3>
-              <CompanyTable companies={state.scored} />
+              <h3 className="text-lg font-semibold mb-3">产业链推理</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {state.chain.map((c, i) => (
+                  <div key={i} className="border rounded-lg p-3 text-sm">
+                    <h4 className="font-semibold text-blue-700 mb-1">{c.direction}</h4>
+                    {c.upstream.length > 0 && <p className="text-gray-500 text-xs">上游: {c.upstream.slice(0,3).join("、")}</p>}
+                    {c.downstream.length > 0 && <p className="text-gray-500 text-xs">下游: {c.downstream.slice(0,3).join("、")}</p>}
+                    {c.key_materials.length > 0 && <p className="text-gray-500 text-xs">关键材料: {c.key_materials.slice(0,3).join("、")}</p>}
+                  </div>
+                ))}
+              </div>
+              {state.chain.length === 0 && state.current_step.startsWith("chain_reasoning") && (
+                <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full" />
+                  DeepSeek 正在推理产业链...
+                </div>
+              )}
             </section>
           )}
 
-          {state.scored.length > 0 && (
+          {state.current_step.startsWith("company_mapping") && (
             <section className="mb-8">
-              <h3 className="text-lg font-semibold mb-3">投资逻辑卡片</h3>
-              <LogicCards companies={state.scored} />
+              <h3 className="text-lg font-semibold mb-3">公司映射</h3>
+              {state.companies.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {state.companies.map((c, i) => (
+                    <span key={i} className="px-3 py-1.5 bg-gray-100 rounded-lg text-sm">
+                      {c.company_name} <span className="text-gray-400 text-xs">{c.ticker}</span>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full" />
+                  DeepSeek 正在映射公司...
+                </div>
+              )}
             </section>
+          )}
+
+          {state.current_step.startsWith("scoring") && (
+            <section className="mb-8">
+              <h3 className="text-lg font-semibold mb-3">暴露度评分</h3>
+              {state.scored.length > 0 ? (
+                <CompanyTable companies={state.scored} />
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-gray-400">
+                  <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full" />
+                  DeepSeek 正在评估暴露度...
+                </div>
+              )}
+            </section>
+          )}
+
+          {state.status === "completed" && (
+            <>
+              <section className="mb-8">
+                <h3 className="text-lg font-semibold mb-3">产业链图谱</h3>
+                <IndustryChainGraph data={graphData} />
+              </section>
+
+              {state.scored.length > 0 && (
+                <section className="mb-8">
+                  <h3 className="text-lg font-semibold mb-3">
+                    核心公司映射 ({state.scored.length})
+                  </h3>
+                  <CompanyTable companies={state.scored} />
+                </section>
+              )}
+
+              {state.scored.length > 0 && (
+                <section className="mb-8">
+                  <h3 className="text-lg font-semibold mb-3">投资逻辑卡片</h3>
+                  <LogicCards companies={state.scored} />
+                </section>
+              )}
+            </>
           )}
         </div>
       )}
