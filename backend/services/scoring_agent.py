@@ -67,6 +67,7 @@ class ScoringAgent:
 
 请评分并排序。""",
             temperature=0,
+            max_tokens=8192,
         )
 
         scored = result if isinstance(result, list) else []

@@ -154,6 +154,21 @@ class AnalysisPipeline:
             await self._emit(state)
             return state
 
+        # Clean old data for this theme before writing new
+        try:
+            with self._neo4j.driver.session() as session:
+                session.run(
+                    "MATCH (th:Theme {name: $name})-[r:REQUIRES]->() DELETE r", name=topic
+                )
+                session.run(
+                    "MATCH ()-[r:EXPOSED_TO]->(th:Theme {name: $name}) DELETE r", name=topic
+                )
+                session.run(
+                    "MATCH ()-[r:SUPPLIES]->(t:Technology) WHERE EXISTS((:Theme {name: $name})-[:REQUIRES]->(t)) DELETE r", name=topic
+                )
+        except Exception:
+            pass
+
         # Persist theme node + chain structure in graph
         try:
             theme = ThemeEntity(
