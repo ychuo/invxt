@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import QuickTags from "@/components/QuickTags";
 import MarketToggle from "@/components/MarketToggle";
@@ -19,13 +18,13 @@ function GraphSeparator() {
 }
 
 export default function HomePage() {
-  const router = useRouter();
   const [market, setMarket] = useState("A");
   const [loading, setLoading] = useState(false);
 
   const handleSearch = (topic: string) => {
     setLoading(true);
-    router.push(`/analysis?q=${encodeURIComponent(topic)}&market=${market}`);
+    window.open(`/analysis?q=${encodeURIComponent(topic)}&market=${market}`, "_blank");
+    setLoading(false);
   };
 
   return (
