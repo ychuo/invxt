@@ -103,7 +103,8 @@ export default function IndustryChainGraph({ data }: Props) {
     const result=sankey<any,any>().nodeWidth(20).nodePadding(28).extent([[0,0],[w,h]]).nodeAlign(sankeyJustify).iterations(32)({nodes:nodes.map(n=>({...n})),links:slinks});
     const colWidth=w/4.5;
     for(const node of result.nodes){const col=node.column??0;node.x0=col*colWidth;node.x1=node.x0+20;}
-    // Resolve overlaps within each column: nudge overlapping nodes apart
+    // Resolve overlaps: nudge nodes apart, shift links proportionally
+    const nodeShift = new Map<any, number>(); // track cumulative shift per node
     const colGroups: any[][] = [[],[],[],[]];
     for(const node of result.nodes) colGroups[node.column??0].push(node);
     for(let ci=0;ci<4;ci++){
@@ -114,21 +115,20 @@ export default function IndustryChainGraph({ data }: Props) {
         const gap = (curr.y0 ?? 0) - prevBottom;
         if(gap < 4){
           const shift = 4 - gap;
-          // Nudge current node and all subsequent ones down
           for(let j=i;j<cn.length;j++){
             cn[j].y0 = (cn[j].y0??0) + shift;
             cn[j].y1 = (cn[j].y1??0) + shift;
+            nodeShift.set(cn[j], (nodeShift.get(cn[j])||0) + shift);
           }
         }
       }
     }
-    // Sync link endpoints to potentially nudged node positions
+    // Shift link endpoints by the same amount as their source/target nodes
     for(const link of result.links){
-      const src = link.source, tgt = link.target;
-      if(src && tgt){
-        link.y0 = src.y0 + (src.y1-src.y0)/2;
-        link.y1 = tgt.y0 + (tgt.y1-tgt.y0)/2;
-      }
+      const srcShift = nodeShift.get(link.source) || 0;
+      const tgtShift = nodeShift.get(link.target) || 0;
+      if(link.y0 != null) link.y0 += srcShift;
+      if(link.y1 != null) link.y1 += tgtShift;
     }
     return {nodes:result.nodes,links:result.links.map((l:any,i:number)=>({...l,edgeType:linkMeta[i]?.edgeType??""})),width:w,height:h};
   }, [sankeyData]);
