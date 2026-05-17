@@ -16,6 +16,8 @@ class SearchClient:
                 query=query,
                 search_depth="advanced",
                 max_results=max_results,
+                include_raw_content=False,
+                include_answer=False,
             )
             return [
                 {"title": r.get("title", ""), "url": r.get("url", ""), "content": r.get("content", "")}
