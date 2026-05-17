@@ -101,7 +101,12 @@ export default function IndustryChainGraph({ data }: Props) {
     const h = Math.max(900, maxCol * 38);
     const w = Math.max(1400, 380 * 4);
     const result=sankey<any,any>().nodeWidth(20).nodePadding(28).extent([[0,0],[w,h]]).nodeAlign(sankeyJustify).iterations(32)({nodes:nodes.map(n=>({...n})),links:slinks});
-    const colWidth=w/4.5; for(const node of result.nodes){const col=node.column??0;node.x0=col*colWidth;node.x1=node.x0+20;}
+    const colWidth=w/4.5;
+    // Force equal vertical spacing within each column to prevent overlap
+    const colNodes: any[][] = [[],[],[],[]];
+    for(const node of result.nodes){const col=node.column??0;node.x0=col*colWidth;node.x1=node.x0+20;colNodes[col].push(node);}
+    for(let ci=0;ci<4;ci++){const cn=colNodes[ci];if(cn.length<=1)continue;const th=h-40,step=th/cn.length;
+      for(let i=0;i<cn.length;i++){cn[i].y0=20+i*step;cn[i].y1=20+i*step+Math.max(20,step-8);}}
     return {nodes:result.nodes,links:result.links.map((l:any,i:number)=>({...l,edgeType:linkMeta[i]?.edgeType??""})),width:w,height:h};
   }, [sankeyData]);
 
