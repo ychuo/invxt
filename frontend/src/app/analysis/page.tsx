@@ -167,47 +167,41 @@ export default function AnalysisPage() {
             </section>
           )}
 
-          {/* Step 3 done: Company list (unscored) */}
-          {state.companies.length > 0 && state.scored.length === 0 && (
+          {/* Step 3 done: Company table (scores fill in at step 4) */}
+          {state.companies.length > 0 && (
             <section className="mb-8">
               <h3 className="text-lg font-semibold mb-3">
-                核心公司映射 ({state.companies.length})
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {state.companies.map((c, i) => (
-                  <span key={i} className="px-3 py-1.5 bg-gray-100 rounded-lg text-sm">
-                    {c.company_name} <span className="text-gray-400 text-xs">{c.ticker}</span>
+                核心公司映射 ({state.scored.length || state.companies.length})
+                {state.scored.length === 0 && state.status === "running" && (
+                  <span className="ml-2 text-xs font-normal text-gray-400 inline-flex items-center gap-1">
+                    <span className="animate-spin w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full" />
+                    评分中...
                   </span>
-                ))}
-              </div>
+                )}
+              </h3>
+              <CompanyTable companies={
+                state.scored.length > 0
+                  ? state.scored
+                  : state.companies.map(c => ({
+                      company_name: c.company_name,
+                      ticker: c.ticker,
+                      market: c.market as "A" | "US",
+                      exposure_score: 0,
+                      dimensions: { product_relevance: 0, revenue_elasticity: 0, chain_criticality: 0, competitive_moat: 0, market_awareness: 0 },
+                      investment_logic: c.reasoning || "",
+                      key_variables: [],
+                      risks: [],
+                    }))
+              } />
             </section>
           )}
 
-          {/* Step 3→4: Scoring spinner */}
-          {state.companies.length > 0 && state.scored.length === 0 && state.status === "running" && (
-            <section className="mb-8">
-              <h3 className="text-lg font-semibold mb-3">暴露度评分</h3>
-              <div className="flex items-center gap-2 text-sm text-gray-400">
-                <div className="animate-spin w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full" />
-                DeepSeek 正在评估每家公司的主题暴露度...
-              </div>
-            </section>
-          )}
-
-          {/* Step 4 done: Scored rankings + logic cards */}
+          {/* Step 4 done: Logic cards */}
           {state.scored.length > 0 && (
-            <>
-              <section className="mb-8">
-                <h3 className="text-lg font-semibold mb-3">
-                  核心公司映射 ({state.scored.length})
-                </h3>
-                <CompanyTable companies={state.scored} />
-              </section>
-              <section className="mb-8">
-                <h3 className="text-lg font-semibold mb-3">投资逻辑卡片</h3>
-                <LogicCards companies={state.scored} />
-              </section>
-            </>
+            <section className="mb-8">
+              <h3 className="text-lg font-semibold mb-3">投资逻辑卡片</h3>
+              <LogicCards companies={state.scored} />
+            </section>
           )}
         </div>
       )}

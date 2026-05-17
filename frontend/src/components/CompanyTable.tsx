@@ -5,15 +5,9 @@ interface Props {
 }
 
 function ScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 80 ? "bg-green-500" : score >= 60 ? "bg-yellow-500" : "bg-gray-400";
-  return (
-    <span
-      className={`${color} text-white px-2.5 py-0.5 rounded-full text-xs font-bold`}
-    >
-      {score}
-    </span>
-  );
+  if (score <= 0) return <span className="text-gray-300 text-xs">…</span>;
+  const color = score >= 80 ? "bg-green-500" : score >= 60 ? "bg-yellow-500" : "bg-gray-400";
+  return <span className={`${color} text-white px-2.5 py-0.5 rounded-full text-xs font-bold`}>{score}</span>;
 }
 
 export default function CompanyTable({ companies }: Props) {
