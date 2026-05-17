@@ -3,23 +3,23 @@ from backend.services.llm_client import LLMClient
 from backend.kg.neo4j_client import Neo4jClient
 from backend.kg.schemas import Relation, RelationType
 
-SYSTEM_PROMPT = """你是一个投资主题暴露度评估专家。给定一个主题和一组公司，你需要评估每家公司在该主题上的暴露度（0-100分）。
+# Tier → fixed score mapping (stable across models)
+TIER_SCORES: dict[str, int] = {
+    "核心": 90,
+    "重要": 75,
+    "一般": 55,
+    "边缘": 35,
+    "蹭概念": 15,
+}
 
-评分考虑 5 个维度（各0-100分）：
-1. 产品关联度：公司产品/业务与主题的直接相关性
-2. 收入弹性：主题发展对公司收入的潜在拉动
-3. 产业链核心度：公司在产业链中的不可替代性
-4. 竞争壁垒：技术/市场壁垒
-5. 市场认知度：当前市场对该关联的认知程度
+SYSTEM_PROMPT = """你是一个投资主题暴露度评估专家。给定一个主题和一组公司，你需要评估每家公司在该主题上的暴露度等级。
 
-综合分 = (产品关联度 × 0.30 + 收入弹性 × 0.25 + 产业链核心度 × 0.25 + 竞争壁垒 × 0.10 + 市场认知度 × 0.10)，四舍五入取整。
-
-评分锚定标准：
-- 产业链绝对龙头、主营直接对应、主题爆发将显著拉动业绩：85-95分
-- 产业链重要参与者、有实质业务关联但非最核心：70-84分
-- 产业链一般参与者、有技术/产品关联但弹性有限：50-69分
-- 边缘相关、概念为主无实质业绩贡献：30-49分
-- 蹭概念、关联极弱：10-29分
+只分五档，不需要打具体分数：
+- 核心：产业链绝对龙头，主营直接对应，主题爆发显著拉动业绩
+- 重要：产业链重要参与者，有实质业务关联但非最核心
+- 一般：有技术/产品关联，但收入弹性有限
+- 边缘：概念为主，无实质业绩贡献
+- 蹭概念：关联极弱，纯题材炒作
 
 输出严格的 JSON 数组格式：
 [
@@ -27,14 +27,7 @@ SYSTEM_PROMPT = """你是一个投资主题暴露度评估专家。给定一个�
     "company_name": "公司名",
     "ticker": "代码",
     "market": "A/US",
-    "exposure_score": 85,
-    "dimensions": {
-      "product_relevance": 90,
-      "revenue_elasticity": 80,
-      "chain_criticality": 85,
-      "competitive_moat": 80,
-      "market_awareness": 90
-    },
+    "tier": "核心/重要/一般/边缘/蹭概念",
     "investment_logic": "核心逻辑2-3句话",
     "key_variables": ["关键变量1", "关键变量2"],
     "risks": ["风险1"]
@@ -42,10 +35,10 @@ SYSTEM_PROMPT = """你是一个投资主题暴露度评估专家。给定一个�
 ]
 
 规则：
-- 严格按照加权公式计算 exposure_score
-- 同一产业链核心环节的公司分数要高
-- 区分"真正受益"和"蹭概念"，后者给低分
-- 按 exposure_score 降序排列
+- tier 必须是五个值之一：核心、重要、一般、边缘、蹭概念
+- 同一产业链核心环节的公司优先给"核心"
+- 确实没实质业务的果断给"蹭概念"
+- 按 tier 优先级（核心>重要>一般>边缘>蹭概念）降序排列
 - 只输出 JSON 数组，不要其他文字"""
 
 
@@ -65,13 +58,26 @@ class ScoringAgent:
 公司列表：
 {json.dumps(companies, ensure_ascii=False, indent=2)}
 
-请评分并排序。""",
+请评定每家公司在该主题上的暴露度等级。""",
             temperature=0,
-            max_tokens=8192,
+            max_tokens=4096,
         )
 
         scored = result if isinstance(result, list) else []
-        scored.sort(key=lambda x: x.get("exposure_score", 0), reverse=True)
+        tier_order = {"核心": 0, "重要": 1, "一般": 2, "边缘": 3, "蹭概念": 4}
+        scored.sort(key=lambda x: tier_order.get(x.get("tier", "一般"), 2))
+
+        # Map tier to stable score and keep dimensions as derived values
+        for c in scored:
+            tier = c.get("tier", "一般")
+            c["exposure_score"] = TIER_SCORES.get(tier, 55)
+            c["dimensions"] = {
+                "product_relevance": c["exposure_score"],
+                "revenue_elasticity": c["exposure_score"],
+                "chain_criticality": c["exposure_score"],
+                "competitive_moat": c["exposure_score"],
+                "market_awareness": c["exposure_score"],
+            }
         return scored
 
     def write_to_graph(self, theme_name: str, scored_companies: list[dict]):
