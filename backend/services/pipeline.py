@@ -100,6 +100,27 @@ class AnalysisPipeline:
             await self._emit(state)
             return state
 
+        # Write chain structure to Neo4j immediately so graph is available
+        try:
+            from backend.kg.schemas import ThemeEntity as TE, TechnologyEntity, MaterialEntity, EquipmentEntity, Relation, RelationType
+            theme = TE(name=topic, description=state.theme_result.get("summary", ""), category=state.theme_result.get("category", ""))
+            self._neo4j.merge_entity(theme)
+            for chain in state.chain_results:
+                tech_name = chain.get("direction", "")
+                if not tech_name: continue
+                self._neo4j.merge_entity(TechnologyEntity(name=tech_name))
+                self._neo4j.create_relation(Relation(from_name=topic, to_name=tech_name, type=RelationType.REQUIRES))
+                for mat_name in chain.get("key_materials", []):
+                    if mat_name:
+                        self._neo4j.merge_entity(MaterialEntity(name=mat_name))
+                        self._neo4j.create_relation(Relation(from_name=tech_name, to_name=mat_name, type=RelationType.USES_MATERIAL))
+                for eq_name in chain.get("key_equipment", []):
+                    if eq_name:
+                        self._neo4j.merge_entity(EquipmentEntity(name=eq_name))
+                        self._neo4j.create_relation(Relation(from_name=tech_name, to_name=eq_name, type=RelationType.USES_EQUIPMENT))
+        except Exception:
+            pass
+
         # Step 3: Company mapping (keep per-tech grouping for SUPPLIES edges)
         state.current_step = "company_mapping"
         await self._emit(state)
@@ -136,7 +157,22 @@ class AnalysisPipeline:
             await self._emit(state)
             return state
 
-        # Step 4: Scoring (use original topic for graph consistency)
+        # Clean old data for this theme before writing new
+        try:
+            with self._neo4j.driver.session() as session:
+                session.run(
+                    "MATCH (th:Theme {name: $name})-[r:REQUIRES]->() DELETE r", name=topic
+                )
+                session.run(
+                    "MATCH ()-[r:EXPOSED_TO]->(th:Theme {name: $name}) DELETE r", name=topic
+                )
+                session.run(
+                    "MATCH ()-[r:SUPPLIES]->(t:Technology) WHERE EXISTS((:Theme {name: $name})-[:REQUIRES]->(t)) DELETE r", name=topic
+                )
+        except Exception:
+            pass
+
+        # Step 4: Scoring
         state.current_step = "scoring"
         await self._emit(state)
         display_name = state.theme_result.get("theme_name", topic)
@@ -154,22 +190,7 @@ class AnalysisPipeline:
             await self._emit(state)
             return state
 
-        # Clean old data for this theme before writing new
-        try:
-            with self._neo4j.driver.session() as session:
-                session.run(
-                    "MATCH (th:Theme {name: $name})-[r:REQUIRES]->() DELETE r", name=topic
-                )
-                session.run(
-                    "MATCH ()-[r:EXPOSED_TO]->(th:Theme {name: $name}) DELETE r", name=topic
-                )
-                session.run(
-                    "MATCH ()-[r:SUPPLIES]->(t:Technology) WHERE EXISTS((:Theme {name: $name})-[:REQUIRES]->(t)) DELETE r", name=topic
-                )
-        except Exception:
-            pass
-
-        # Persist theme node + chain structure in graph
+        # Persist theme node + chain structure in graph (REQUIRES, USES_MATERIAL, USES_EQUIPMENT)
         try:
             theme = ThemeEntity(
                 name=topic,
