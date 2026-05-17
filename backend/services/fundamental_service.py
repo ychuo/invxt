@@ -21,7 +21,7 @@ def _parse_a_share_revenue(df) -> dict[str, float] | None:
         df = df.copy()
         df["报告日期"] = pd.to_datetime(df["报告日期"], errors="coerce")
         latest = df["报告日期"].max()
-        if latest is None:
+        if pd.isna(latest):
             return None
 
         # Filter to most recent date
@@ -32,16 +32,19 @@ def _parse_a_share_revenue(df) -> dict[str, float] | None:
         industry = recent[recent["分类类型"] == "按行业分类"]
         segments_df = product if len(product) > 0 else industry
 
+        # Detect data format: decimal (0-1) or percentage (>1)
+        max_pct = segments_df["收入比例"].max()
+        is_decimal = max_pct <= 1.0
+
         segments: dict[str, float] = {}
         for _, row in segments_df.iterrows():
             name = str(row.get("主营构成", "")).strip()
             pct_val = row.get("收入比例")
             if name and pct_val is not None:
                 pct = float(pct_val)
-                if pct > 0 and pct <= 1.0:
-                    # Convert decimal to percentage if needed
+                if is_decimal:
                     pct = round(pct * 100, 1)
-                elif pct > 0:
+                else:
                     pct = round(pct, 1)
                 if name != "其他(补充)" and pct > 0:
                     segments[name] = pct
