@@ -1,6 +1,0 @@
-- generic [active] [ref=e1]:
-  - main [ref=e2]:
-    - heading "Invxt" [level=1] [ref=e3]
-    - paragraph [ref=e4]: 主题 “先进封装” · A股
-    - generic [ref=e5]: 正在分析...
-  - alert [ref=e7]
