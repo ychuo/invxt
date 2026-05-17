@@ -35,7 +35,17 @@ class LLMClient:
             )
             response.raise_for_status()
             data = response.json()
-            return data["choices"][0]["message"]["content"]
+            choice = data["choices"][0]
+            msg = choice.get("message", {})
+            content = msg.get("content", "")
+            # v4-flash may return empty content when thinking is enabled; use reasoning_content as fallback
+            if not content:
+                content = msg.get("reasoning_content", "")
+            if not content:
+                # Log raw response for debugging
+                import sys
+                print(f"[LLM] Empty response. Finish reason: {choice.get('finish_reason')}. Keys: {list(msg.keys())}", file=sys.stderr)
+            return content
 
     async def chat_with_json(
         self,
