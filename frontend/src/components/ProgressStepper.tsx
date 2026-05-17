@@ -1,11 +1,11 @@
 "use client";
 
 const STEPS = [
-  { key: "search", label: "实时搜索" },
-  { key: "theme_understanding", label: "主题理解" },
-  { key: "chain_reasoning", label: "产业链推理" },
-  { key: "company_mapping", label: "公司映射" },
-  { key: "scoring", label: "暴露度评分" },
+  { key: "search", label: "搜索" },
+  { key: "theme_understanding", label: "主题" },
+  { key: "chain_reasoning", label: "产业链" },
+  { key: "company_mapping", label: "公司" },
+  { key: "scoring", label: "评分" },
 ];
 
 interface ProgressStepperProps {
@@ -17,32 +17,26 @@ export default function ProgressStepper({ currentStep }: ProgressStepperProps) {
   const currentIndex = isDone ? STEPS.length : STEPS.findIndex((s) => currentStep.startsWith(s.key));
 
   return (
-    <div className="flex items-center gap-2 mb-8">
+    <div className="flex items-center gap-1.5" style={{ fontFamily: "var(--font-serif)" }}>
       {STEPS.map((step, i) => {
         const isComplete = isDone || i < currentIndex;
         const isActive = !isDone && i === currentIndex;
         return (
-          <div key={step.key} className="flex items-center gap-2">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                isComplete
-                  ? "bg-green-500 text-white"
-                  : isActive
-                  ? "bg-blue-600 text-white animate-pulse"
-                  : "bg-gray-200 text-gray-500"
-              }`}
-            >
-              {isComplete ? "✓" : i + 1}
-            </div>
-            <span
-              className={`text-sm ${
-                isActive ? "text-blue-700 font-medium" : isComplete ? "text-green-600" : "text-gray-400"
-              }`}
-            >
+          <span key={step.key} className="flex items-center gap-1.5">
+            {isComplete ? (
+              <span className="w-5 h-5 rounded-full bg-[#0d9488] text-white flex items-center justify-center text-[10px]">✓</span>
+            ) : isActive ? (
+              <span className="w-5 h-5 rounded-full bg-[#14b8a6] text-white flex items-center justify-center text-[10px] animate-pulse">{i + 1}</span>
+            ) : (
+              <span className="w-5 h-5 rounded-full bg-[#e5e7eb] text-[#94a3b8] flex items-center justify-center text-[10px]">{i + 1}</span>
+            )}
+            <span className={`text-[11px] ${
+              isActive ? "text-[#0d9488] font-bold" : isComplete ? "text-[#0f766e]" : "text-[#94a3b8]"
+            }`}>
               {step.label}
             </span>
-            {i < STEPS.length - 1 && <div className={`w-8 h-px ${isComplete ? "bg-green-400" : "bg-gray-300"}`} />}
-          </div>
+            {i < STEPS.length - 1 && <span className="text-[#e5e7eb] text-[10px] mx-0.5">·</span>}
+          </span>
         );
       })}
     </div>

@@ -12,12 +12,13 @@ interface QuickTagsProps {
 
 export default function QuickTags({ onSelect }: QuickTagsProps) {
   return (
-    <div className="flex flex-wrap gap-2 mt-4">
+    <div className="flex flex-wrap gap-x-6 gap-y-2 mt-5">
       {TAGS.map((tag) => (
         <button
           key={tag}
           onClick={() => onSelect(tag)}
-          className="px-4 py-2 rounded-full bg-gray-100 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors cursor-pointer border border-transparent hover:border-blue-200"
+          className="text-[#777] text-sm border-b border-dotted border-[#ddd] pb-0.5 hover:text-[#0d9488] hover:border-[#14b8a6] transition-colors cursor-pointer bg-transparent"
+          style={{ fontFamily: "var(--font-serif)" }}
         >
           {tag}
         </button>

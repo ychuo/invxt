@@ -13,15 +13,15 @@ interface MarketToggleProps {
 
 export default function MarketToggle({ value, onChange }: MarketToggleProps) {
   return (
-    <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+    <div className="inline-flex gap-1 bg-[#f5f5f5] rounded-lg p-1">
       {OPTIONS.map((opt) => (
         <button
           key={opt.value}
           onClick={() => onChange(opt.value)}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
             value === opt.value
-              ? "bg-white text-blue-700 shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
+              ? "bg-white text-[#0f766e] shadow-sm"
+              : "text-[#999] hover:text-[#666]"
           }`}
         >
           {opt.label}

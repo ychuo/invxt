@@ -18,12 +18,13 @@ function buildAdjacency(data: GraphData): Map<string, Set<string>> {
 function getNeighborhood(nodeId: string, adj: Map<string, Set<string>>, nodeTypes: Map<string, string>): Set<string> {
   const nb = new Set<string>(); nb.add(nodeId);
   const clickedType = nodeTypes.get(nodeId);
-  for (const n1 of adj.get(nodeId) || []) {
+  const neighbors = adj.get(nodeId) || new Set<string>();
+  for (const n1 of Array.from(neighbors)) {
     nb.add(n1);
-    // 2-hop only when clicking Material/Equipment: reach Company + Theme via Technology
     if (clickedType === "Material" || clickedType === "Equipment") {
       if (nodeTypes.get(n1) === "Technology") {
-        for (const n2 of adj.get(n1) || []) {
+        const n2neighbors = adj.get(n1) || new Set<string>();
+for (const n2 of Array.from(n2neighbors)) {
           const t2 = nodeTypes.get(n2);
           if (t2 === "Company" || t2 === "Theme") nb.add(n2);
         }
@@ -57,7 +58,6 @@ export default function IndustryChainGraph({ data }: Props) {
     return () => document.removeEventListener("keydown", onKey);
   }, [fullscreen]);
 
-  // Auto-center on fullscreen toggle
   useEffect(() => { autoCenter(); }, [fullscreen]);
 
   const adjacency = useMemo(() => (data ? buildAdjacency(data) : new Map()), [data]);
@@ -94,7 +94,6 @@ export default function IndustryChainGraph({ data }: Props) {
     const idxMap=new Map<string,number>(); nodes.forEach((n,i)=>idxMap.set(n.id,i));
     const slinks:{source:number;target:number;value:number}[]=[],linkMeta:{edgeType:string}[]=[];
     for(const l of links){const si=idxMap.get(l.source),ti=idxMap.get(l.target);if(si!==undefined&&ti!==undefined){slinks.push({source:si,target:ti,value:l.value});linkMeta.push({edgeType:l.edgeType});}}
-    // Compute height based on max nodes per column to prevent overlap
     const cols = [0,0,0,0];
     for (const n of nodes) cols[n.column] = (cols[n.column]||0) + 1;
     const maxCol = Math.max(...cols);
@@ -103,8 +102,7 @@ export default function IndustryChainGraph({ data }: Props) {
     const result=sankey<any,any>().nodeWidth(20).nodePadding(28).extent([[0,0],[w,h]]).nodeAlign(sankeyJustify).iterations(32)({nodes:nodes.map(n=>({...n})),links:slinks});
     const colWidth=w/4.5;
     for(const node of result.nodes){const col=node.column??0;node.x0=col*colWidth;node.x1=node.x0+20;}
-    // Resolve overlaps: nudge nodes apart, shift links proportionally
-    const nodeShift = new Map<any, number>(); // track cumulative shift per node
+    const nodeShift = new Map<any, number>();
     const colGroups: any[][] = [[],[],[],[]];
     for(const node of result.nodes) colGroups[node.column??0].push(node);
     for(let ci=0;ci<4;ci++){
@@ -123,7 +121,6 @@ export default function IndustryChainGraph({ data }: Props) {
         }
       }
     }
-    // Shift link endpoints by the same amount as their source/target nodes
     for(const link of result.links){
       const srcShift = nodeShift.get(link.source) || 0;
       const tgtShift = nodeShift.get(link.target) || 0;
@@ -160,11 +157,9 @@ export default function IndustryChainGraph({ data }: Props) {
   const handleMouseMove = useCallback((e: React.MouseEvent) => { if(!dragging.current)return; setPan({x:e.clientX-dragStart.current.x,y:e.clientY-dragStart.current.y}); }, []);
   const handleMouseUp = useCallback(() => { dragging.current=false; }, []);
 
-  // Wheel zoom + Safari gesture pinch — attach to document to capture all events
   const zoomRef2 = useRef(zoom); zoomRef2.current = zoom;
   useEffect(() => {
     const onWheel=(e:WheelEvent)=>{
-      // Only handle if the event target is inside our container
       if (!containerRef.current?.contains(e.target as Node)) return;
       e.preventDefault();
       const f=e.ctrlKey?(e.deltaY>0?0.93:1.07):(e.deltaY>0?0.9:1.1);
@@ -179,7 +174,6 @@ export default function IndustryChainGraph({ data }: Props) {
     return ()=>{document.removeEventListener("wheel",onWheel);document.removeEventListener("gesturestart",onGestureStart);document.removeEventListener("gesturechange",onGestureChange);};
   }, []);
 
-  // Touch pinch zoom — use ref for current zoom to avoid stale closure
   const pinchRef = useRef({ dist: 0, zoom: 1 });
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
@@ -195,15 +189,68 @@ export default function IndustryChainGraph({ data }: Props) {
     return ()=>{el.removeEventListener("touchstart",onTS);el.removeEventListener("touchmove",onTM);el.removeEventListener("touchend",onTE);};
   }, []);
 
-  if (!data || data.nodes.length === 0) return <div className="h-64 flex items-center justify-center text-gray-400 border rounded-lg">暂无图谱数据</div>;
+  if (!data || data.nodes.length === 0) return (
+    <div className="h-64 flex items-center justify-center text-[#94a3b8] border border-[#f0f0f0] rounded-[10px]" style={{ fontFamily: "var(--font-serif)" }}>
+      暂无图谱数据
+    </div>
+  );
 
   const svgH = Math.max(layout.height||600, sankeyData.nodes.length*24), svgW = layout.width||1200;
-  const containerClass = fullscreen ? "fixed inset-0 z-50 bg-white flex flex-col" : "relative h-96 border rounded-lg overflow-hidden group";
+  const containerClass = fullscreen
+    ? "fixed inset-0 z-50 bg-white flex flex-col"
+    : "border border-[#f0f0f0] rounded-[10px] overflow-hidden";
 
   return (
     <div className={containerClass}>
-      <div className={`flex-1 overflow-hidden ${fullscreen?"":"h-full"}`}>
-        <div ref={containerRef} className="w-full h-full overflow-hidden cursor-grab active:cursor-grabbing select-none" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+      {/* ===== Toolbar row ===== */}
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-[#f0f0f0] bg-white flex-wrap">
+        <button
+          onClick={() => setShowCompanies((s) => !s)}
+          className={`px-2.5 py-1 rounded-md text-[10px] font-bold border transition-colors ${
+            showCompanies
+              ? "bg-[#f0fdfa] text-[#0d9488] border-[#99f6e4]"
+              : "bg-white text-[#64748b] border-[#e5e7eb] hover:bg-[#f8fafc]"
+          }`}
+        >
+          {showCompanies ? "公司 ON" : "公司"}
+        </button>
+        <span className="w-px h-5 bg-[#e5e7eb] mx-0.5" />
+        <button onClick={() => setZoom((z) => Math.max(0.1, z / 1.2))} className="px-2 py-1 rounded-md text-[10px] font-bold bg-white text-[#64748b] border border-[#e5e7eb] hover:bg-[#f8fafc]">−</button>
+        <span className="text-[10px] text-[#94a3b8] min-w-[32px] text-center">{Math.round(zoom * 100)}%</span>
+        <button onClick={() => setZoom((z) => Math.min(5, z * 1.2))} className="px-2 py-1 rounded-md text-[10px] font-bold bg-white text-[#64748b] border border-[#e5e7eb] hover:bg-[#f8fafc]">+</button>
+        <button onClick={doReset} className="px-2 py-1 rounded-md text-[10px] font-bold bg-white text-[#64748b] border border-[#e5e7eb] hover:bg-[#f8fafc]">复位</button>
+        <span className="w-px h-5 bg-[#e5e7eb] mx-0.5" />
+        <button onClick={toggleFullscreen} className="px-2 py-1 rounded-md text-[10px] font-bold bg-white text-[#64748b] border border-[#e5e7eb] hover:bg-[#f8fafc]">
+          {fullscreen ? "✕ 退出" : "⛶ 全屏"}
+        </button>
+        {expandedTechs.size > 0 && (
+          <button onClick={() => { setExpandedTechs(new Set()); setHighlightNode(null); }} className="px-2 py-1 rounded-md text-[10px] font-bold text-[#b45309] border border-[#fed7aa] bg-[#fff7ed]">
+            收起全部
+          </button>
+        )}
+        {highlightNode && (
+          <button onClick={() => setHighlightNode(null)} className="px-2 py-1 rounded-md text-[10px] font-bold text-[#b45309] border border-[#fed7aa] bg-[#fff7ed]">
+            清除高亮
+          </button>
+        )}
+      </div>
+
+      {/* ===== Legend row ===== */}
+      <div className="flex items-center gap-3 px-3 py-1.5 border-b border-[#f8f8f8] bg-[#fcfcfd]">
+        {LEGEND_ITEMS.map((item) => (
+          <div key={item.type} className="flex items-center gap-1">
+            <span className="inline-block w-2 h-2 rounded-sm" style={{ background: NODE_COLORS[item.type] }} />
+            <span className="text-[9px] text-[#94a3b8]">{item.label}</span>
+          </div>
+        ))}
+        <div className="flex-1" />
+        <span className="text-[8px] text-[#d4d4d8]">拖拽平移 · 滚轮缩放 · 点击节点</span>
+      </div>
+
+      {/* ===== Graph area ===== */}
+      <div className={`flex-1 overflow-hidden relative ${fullscreen ? "" : "h-96"}`}>
+        <div ref={containerRef} className="w-full h-full overflow-hidden cursor-grab active:cursor-grabbing select-none"
+             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
           <div style={{transform:`translate(${pan.x}px,${pan.y}px) scale(${zoom})`,transformOrigin:"0 0"}}>
             <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{width:svgW,height:svgH,minWidth:svgW}}>
               {layout.links.map((link,i)=>{
@@ -226,26 +273,8 @@ export default function IndustryChainGraph({ data }: Props) {
             </svg>
           </div>
         </div>
-      </div>
 
-      <div className="absolute top-2 left-2 z-10 flex gap-1.5 flex-wrap">
-        <button onClick={()=>setShowCompanies((s)=>!s)} className={`bg-white/95 border rounded px-2.5 py-1.5 text-xs font-medium shadow-sm ${showCompanies?"text-green-600 border-green-400 bg-green-50":"text-gray-500 hover:text-gray-700"}`}>{showCompanies?"公司 ON":"公司"}</button>
-        {expandedTechs.size>0&&<button onClick={()=>{setExpandedTechs(new Set());setHighlightNode(null);}} className="bg-white/95 border border-orange-300 rounded px-2.5 py-1.5 text-xs font-medium text-orange-600 shadow-sm">收起全部</button>}
-        {highlightNode&&<button onClick={()=>setHighlightNode(null)} className="bg-white/95 border border-orange-300 rounded px-2.5 py-1.5 text-xs font-medium text-orange-600 shadow-sm">清除高亮</button>}
-        {!fullscreen&&<button onClick={toggleFullscreen} className="bg-white/95 border rounded px-2.5 py-1.5 text-xs font-medium text-gray-500 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:text-gray-700">⛶ 全屏</button>}
-      </div>
 
-      <div className="absolute top-2 right-2 z-10 bg-white/80 rounded px-2 py-1 text-xs text-gray-400">{sankeyData.nodes.length} 节点 · {sankeyData.links.length} 连线</div>
-      {fullscreen&&<button onClick={toggleFullscreen} className="absolute top-8 right-2 z-10 bg-white border rounded-lg px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg hover:bg-gray-50">✕ 退出 (Esc)</button>}
-
-      <div className="absolute bottom-2 left-2 z-10 bg-white/90 border rounded-lg px-3 py-2 shadow-sm">
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">{LEGEND_ITEMS.map((item)=>(<div key={item.type} className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm" style={{background:NODE_COLORS[item.type]}}/><span className="text-gray-500">{item.label}</span></div>))}</div>
-      </div>
-
-      <div className="absolute bottom-2 right-2 z-10 flex gap-1">
-        <button onClick={()=>setZoom((z)=>Math.min(5,z*1.2))} className="bg-white/95 border rounded w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-50 shadow-sm text-sm font-bold">+</button>
-        <button onClick={()=>setZoom((z)=>Math.max(0.1,z/1.2))} className="bg-white/95 border rounded w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-50 shadow-sm text-sm font-bold">−</button>
-        <button onClick={doReset} className="bg-white/95 border rounded px-2 h-7 flex items-center justify-center text-gray-500 hover:bg-gray-50 shadow-sm text-xs">复位</button>
       </div>
     </div>
   );

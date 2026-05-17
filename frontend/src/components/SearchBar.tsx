@@ -17,21 +17,26 @@ export default function SearchBar({ onSearch, loading }: SearchBarProps) {
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-2xl">
-      <div className="flex gap-2 border-2 border-blue-600 rounded-xl p-1.5 focus-within:ring-2 focus-within:ring-blue-200">
+      <div className="flex gap-2 border border-[#e5e7eb] rounded-xl p-1.5 shadow-sm focus-within:border-[#14b8a6] focus-within:ring-2 focus-within:ring-[#ccfbf1] transition-all">
         <input
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="输入主题，例如：HBM、低空经济、人形机器人..."
-          className="flex-1 px-4 py-3 text-lg outline-none rounded-lg"
+          placeholder="输入主题，例如：HBM、低空经济..."
+          className="flex-1 px-4 py-3 text-base outline-none rounded-lg placeholder-[#bbb] italic"
+          style={{ fontFamily: "var(--font-serif)" }}
           disabled={loading}
         />
         <button
           type="submit"
           disabled={loading || !value.trim()}
-          className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="text-white px-6 py-3 rounded-lg font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+          style={{
+            background: "linear-gradient(135deg, #0d9488, #14b8a6)",
+            fontFamily: "var(--font-serif)",
+          }}
         >
-          {loading ? "分析中..." : "开始分析"}
+          {loading ? "分析中..." : "开始分析 →"}
         </button>
       </div>
     </form>

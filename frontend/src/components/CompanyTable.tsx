@@ -4,47 +4,58 @@ interface Props {
   companies: ScoredCompany[];
 }
 
-function ScoreBadge({ score }: { score: number }) {
-  if (score <= 0) return <span className="text-gray-300 text-xs">…</span>;
-  const color = score >= 80 ? "bg-green-500" : score >= 60 ? "bg-yellow-500" : "bg-gray-400";
-  return <span className={`${color} text-white px-2.5 py-0.5 rounded-full text-xs font-bold`}>{score}</span>;
+function ScoreCell({ score }: { score: number }) {
+  if (score <= 0) return <span className="text-[#cbd5e1] text-xs">…</span>;
+  const color =
+    score >= 80 ? "text-[#0f766e]" :
+    score >= 60 ? "text-[#b45309]" :
+    "text-[#64748b]";
+  const barColor =
+    score >= 80 ? "bg-[#0d9488]" :
+    score >= 60 ? "bg-[#d97706]" :
+    "bg-[#cbd5e1]";
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`text-[15px] font-bold ${color}`} style={{ fontFamily: "var(--font-serif)" }}>{score}</span>
+      <div className="flex-1 min-w-[56px] h-1 bg-[#e5e7eb] rounded-sm">
+        <div className={`h-full rounded-sm ${barColor}`} style={{ width: `${score}%` }} />
+      </div>
+    </div>
+  );
 }
 
 export default function CompanyTable({ companies }: Props) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+    <div className="overflow-x-auto border border-[#f0f0f0] rounded-[10px]">
+      <table className="w-full text-[13px]" style={{ fontFamily: "var(--font-serif)" }}>
         <thead>
-          <tr className="bg-gray-50 text-left">
-            <th className="p-3 font-medium">#</th>
-            <th className="p-3 font-medium">公司</th>
-            <th className="p-3 font-medium">代码</th>
-            <th className="p-3 font-medium">市场</th>
-            <th className="p-3 font-medium text-center">暴露度</th>
-            <th className="p-3 font-medium">关联逻辑</th>
+          <tr className="bg-[#fafbfc] text-left">
+            <th className="p-3 font-bold text-[#94a3b8] text-[9px] uppercase tracking-wider w-7">#</th>
+            <th className="p-3 font-bold text-[#94a3b8] text-[9px] uppercase tracking-wider">公司</th>
+            <th className="p-3 font-bold text-[#94a3b8] text-[9px] uppercase tracking-wider w-[72px]">市场</th>
+            <th className="p-3 font-bold text-[#94a3b8] text-[9px] uppercase tracking-wider">暴露度</th>
+            <th className="p-3 font-bold text-[#94a3b8] text-[9px] uppercase tracking-wider">关联逻辑</th>
           </tr>
         </thead>
         <tbody>
           {companies.map((c, i) => (
-            <tr key={c.ticker} className="border-t hover:bg-gray-50">
-              <td className="p-3 text-gray-400">{i + 1}</td>
-              <td className="p-3 font-semibold">{c.company_name}</td>
-              <td className="p-3 text-gray-500 font-mono text-xs">{c.ticker}</td>
+            <tr key={c.ticker} className="border-t border-[#f5f5f5] hover:bg-[#fafbfc] transition-colors">
+              <td className="p-3 text-[#94a3b8]">{i + 1}</td>
               <td className="p-3">
-                <span
-                  className={`text-xs px-2 py-0.5 rounded ${
-                    c.market === "A"
-                      ? "bg-red-50 text-red-600"
-                      : "bg-blue-50 text-blue-600"
-                  }`}
-                >
+                <div className="font-bold text-[#0f172a]">{c.company_name}</div>
+                <div className="text-[10px] text-[#94a3b8] font-mono mt-0.5">{c.ticker}</div>
+              </td>
+              <td className="p-3 whitespace-nowrap">
+                <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                  c.market === "A" ? "bg-[#fef2f2] text-[#dc2626]" : "bg-[#eff6ff] text-[#2563eb]"
+                }`}>
                   {c.market === "A" ? "A股" : "美股"}
                 </span>
               </td>
-              <td className="p-3 text-center">
-                <ScoreBadge score={c.exposure_score} />
+              <td className="p-3">
+                <ScoreCell score={c.exposure_score} />
               </td>
-              <td className="p-3 text-gray-600 text-xs max-w-xs">
+              <td className="p-3 text-[12px] text-[#64748b] leading-relaxed">
                 {c.investment_logic}
               </td>
             </tr>
