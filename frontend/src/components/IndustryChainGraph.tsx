@@ -102,16 +102,29 @@ export default function IndustryChainGraph({ data }: Props) {
     const w = Math.max(1400, 380 * 4);
     const result=sankey<any,any>().nodeWidth(20).nodePadding(28).extent([[0,0],[w,h]]).nodeAlign(sankeyJustify).iterations(32)({nodes:nodes.map(n=>({...n})),links:slinks});
     const colWidth=w/4.5;
-    // Assign x positions + equal y spacing per column, update link endpoints
-    const colNodes: any[][] = [[],[],[],[]];
-    for(const node of result.nodes){const col=node.column??0;node.x0=col*colWidth;node.x1=node.x0+20;colNodes[col].push(node);}
-    const oldY = new Map<string,{y0:number,y1:number}>();
-    for(const node of result.nodes) oldY.set(node.id??node.name,{y0:node.y0,y1:node.y1});
-    for(let ci=0;ci<4;ci++){const cn=colNodes[ci];if(cn.length<=1)continue;const th=h-60,step=th/cn.length;
-      for(let i=0;i<cn.length;i++){const y=30+i*step;cn[i].y0=y;cn[i].y1=y+Math.max(18,step-12);}}
-    // Sync link endpoints to new node y-positions
+    for(const node of result.nodes){const col=node.column??0;node.x0=col*colWidth;node.x1=node.x0+20;}
+    // Resolve overlaps within each column: nudge overlapping nodes apart
+    const colGroups: any[][] = [[],[],[],[]];
+    for(const node of result.nodes) colGroups[node.column??0].push(node);
+    for(let ci=0;ci<4;ci++){
+      const cn = colGroups[ci].sort((a:any,b:any)=>a.y0-b.y0);
+      for(let i=1;i<cn.length;i++){
+        const prev = cn[i-1], curr = cn[i];
+        const prevBottom = prev.y1 ?? (prev.y0+20);
+        const gap = (curr.y0 ?? 0) - prevBottom;
+        if(gap < 4){
+          const shift = 4 - gap;
+          // Nudge current node and all subsequent ones down
+          for(let j=i;j<cn.length;j++){
+            cn[j].y0 = (cn[j].y0??0) + shift;
+            cn[j].y1 = (cn[j].y1??0) + shift;
+          }
+        }
+      }
+    }
+    // Sync link endpoints to potentially nudged node positions
     for(const link of result.links){
-      const src = link.source; const tgt = link.target;
+      const src = link.source, tgt = link.target;
       if(src && tgt){
         link.y0 = src.y0 + (src.y1-src.y0)/2;
         link.y1 = tgt.y0 + (tgt.y1-tgt.y0)/2;
