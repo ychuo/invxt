@@ -43,13 +43,30 @@ class LLMClient:
         user_message: str,
         temperature: float = 0.3,
         max_tokens: int = 4096,
+        retry: bool = True,
     ) -> dict:
         text = await self.chat(system_prompt, user_message, temperature, max_tokens)
         text = text.strip()
+        # Strip BOM
+        if text.startswith("﻿"):
+            text = text[1:]
+        # Strip markdown fences
         if text.startswith("```"):
             lines = text.split("\n")
-            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-        return json.loads(text)
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
+        # Try to find JSON in the response
+        if not text:
+            raise ValueError("Empty response from LLM")
+        # Find first [ or { and parse from there
+        start = min((text.find(c) for c in "[{") if text.find(c) >= 0 else [len(text)]))
+        if start > 0:
+            text = text[start:]
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            if retry:
+                return await self.chat_with_json(system_prompt, user_message, temperature, max_tokens, retry=False)
+            raise
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         async with httpx.AsyncClient(timeout=60) as client:
