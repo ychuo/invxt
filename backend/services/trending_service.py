@@ -1,6 +1,7 @@
 from __future__ import annotations
 import json
 from backend.services.llm_client import LLMClient
+from backend.services.search_client import SearchClient
 
 SYSTEM_PROMPT = """你是一个经验丰富的宏观策略投资研究员，擅长识别被市场低估的结构性主题机会。
 
@@ -18,16 +19,36 @@ SYSTEM_PROMPT = """你是一个经验丰富的宏观策略投资研究员，擅�
 """
 
 USER_MESSAGE = """请推荐 10 个值得关注的投资主题，当前聚焦{market_label}市场。
-避免已经充分定价的热门概念，侧重有预期差、正在酝酿的方向。"""
+避免已经充分定价的热门概念，侧重有预期差、正在酝酿的方向。
+
+以下是近期市场动态，请参考但不要被其限制——你仍然应该加入你判断有价值的前瞻性主题：
+
+{context}
+"""
 
 
 class TrendingService:
     def __init__(self):
         self._llm = LLMClient()
+        self._search = SearchClient()
 
     async def get_trending(self, market: str = "A") -> list[dict]:
         market_label = "A股" if market == "A" else "美股" if market == "US" else "A股+美股"
-        message = USER_MESSAGE.format(market_label=market_label)
+
+        # Search for recent market activity as context
+        search_results = await self._search.search(
+            f"{market_label} 市场热点 热门主题 资金流向 政策动向", max_results=5
+        )
+        context = "未获取到实时动态。"
+        if search_results:
+            snippets = "\n".join(
+                f"- {r.get('title', '')}: {r.get('content', '')[:200]}"
+                for r in search_results if r.get("content")
+            )
+            if snippets:
+                context = snippets
+
+        message = USER_MESSAGE.format(market_label=market_label, context=context)
 
         raw = await self._llm.chat(
             system_prompt=SYSTEM_PROMPT,
@@ -46,5 +67,4 @@ class TrendingService:
             except json.JSONDecodeError:
                 pass
 
-        # Fallback: return empty, frontend will use hardcoded tags
         return []
