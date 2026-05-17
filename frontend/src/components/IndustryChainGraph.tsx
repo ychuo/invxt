@@ -20,12 +20,12 @@ function getNeighborhood(nodeId: string, adj: Map<string, Set<string>>, nodeType
   const clickedType = nodeTypes.get(nodeId);
   for (const n1 of adj.get(nodeId) || []) {
     nb.add(n1);
-    // 2-hop only when clicking Material/Equipment: reach Company via Technology
-    // Only expand from Technology to Company — not to sibling materials/equipment
+    // 2-hop only when clicking Material/Equipment: reach Company + Theme via Technology
     if (clickedType === "Material" || clickedType === "Equipment") {
       if (nodeTypes.get(n1) === "Technology") {
         for (const n2 of adj.get(n1) || []) {
-          if (nodeTypes.get(n2) === "Company") nb.add(n2);
+          const t2 = nodeTypes.get(n2);
+          if (t2 === "Company" || t2 === "Theme") nb.add(n2);
         }
       }
     }
