@@ -89,7 +89,10 @@ class AnalysisPipeline:
         try:
             from backend.services.search_client import SearchClient
             sc = SearchClient()
-            state.search_results = await sc.search(f"{topic} A股 上市公司 产业链 核心标的 受益公司", max_results=8)
+            market_label = {"A": "A股", "US": "美股", "all": "A股 美股"}.get(market, "A股 美股")
+            state.search_results = await sc.search(
+                f"{topic} 最新进展 {market_label} 上市公司 产业链 核心标的 受益公司", max_results=8
+            )
         except Exception:
             pass
         state.current_step = "search_completed"
