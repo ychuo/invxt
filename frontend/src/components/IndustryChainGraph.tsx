@@ -127,19 +127,23 @@ export default function IndustryChainGraph({ data }: Props) {
   const handleMouseMove = useCallback((e: React.MouseEvent) => { if(!dragging.current)return; setPan({x:e.clientX-dragStart.current.x,y:e.clientY-dragStart.current.y}); }, []);
   const handleMouseUp = useCallback(() => { dragging.current=false; }, []);
 
-  // Wheel zoom + Safari gesture pinch
+  // Wheel zoom + Safari gesture pinch — attach to document to capture all events
   const zoomRef2 = useRef(zoom); zoomRef2.current = zoom;
   useEffect(() => {
-    const el=containerRef.current; if(!el)return;
-    const onWheel=(e:WheelEvent)=>{e.preventDefault();const f=e.ctrlKey?(e.deltaY>0?0.93:1.07):(e.deltaY>0?0.9:1.1);setZoom((z)=>Math.min(5,Math.max(0.1,z*f)));};
-    // Safari gesture events
+    const onWheel=(e:WheelEvent)=>{
+      // Only handle if the event target is inside our container
+      if (!containerRef.current?.contains(e.target as Node)) return;
+      e.preventDefault();
+      const f=e.ctrlKey?(e.deltaY>0?0.93:1.07):(e.deltaY>0?0.9:1.1);
+      setZoom((z)=>Math.min(5,Math.max(0.1,z*f)));
+    };
     let gs=1;
-    const onGestureStart=(e:any)=>{e.preventDefault();gs=zoomRef2.current;};
-    const onGestureChange=(e:any)=>{e.preventDefault();setZoom(Math.min(5,Math.max(0.1,gs*e.scale)));};
-    el.addEventListener("wheel",onWheel,{passive:false});
-    el.addEventListener("gesturestart",onGestureStart);
-    el.addEventListener("gesturechange",onGestureChange);
-    return ()=>{el.removeEventListener("wheel",onWheel);el.removeEventListener("gesturestart",onGestureStart);el.removeEventListener("gesturechange",onGestureChange);};
+    const onGestureStart=(e:any)=>{if(!containerRef.current?.contains(e.target as Node))return;e.preventDefault();gs=zoomRef2.current;};
+    const onGestureChange=(e:any)=>{if(!containerRef.current?.contains(e.target as Node))return;e.preventDefault();setZoom(Math.min(5,Math.max(0.1,gs*e.scale)));};
+    document.addEventListener("wheel",onWheel,{passive:false});
+    document.addEventListener("gesturestart",onGestureStart);
+    document.addEventListener("gesturechange",onGestureChange);
+    return ()=>{document.removeEventListener("wheel",onWheel);document.removeEventListener("gesturestart",onGestureStart);document.removeEventListener("gesturechange",onGestureChange);};
   }, []);
 
   // Touch pinch zoom — use ref for current zoom to avoid stale closure
