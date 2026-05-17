@@ -89,14 +89,14 @@ export default function AnalysisPage() {
     };
   }, [taskId]);
 
-  // Step 3: Fetch graph data when theme is ready (use original topic)
+  // Step 3: Fetch graph data when chain reasoning or scoring completes
   useEffect(() => {
-    if (state?.topic) {
+    if (state?.topic && state.chain.length > 0) {
       getGraph(state.topic)
         .then(setGraphData)
         .catch(() => {});
     }
-  }, [state?.topic]);
+  }, [state?.topic, state?.chain?.length, state?.scored?.length]);
 
   if (!topic) {
     return (
