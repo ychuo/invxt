@@ -6,9 +6,9 @@ import math
 async def get_signals_for_companies(
     companies: list[dict],
 ) -> dict[str, dict[str, float | None]]:
-    """Fetch 4 market signals per company (A-share via AkShare, US via yfinance).
+    """Fetch market signals per company (A-share via AkShare, US via yfinance).
 
-    Returns: {ticker: {return_1m, turnover_pct, volume_ratio, rsi_14}}
+    Returns: {ticker: {return_1m, turnover_pct, volume_ratio, rsi_14, fund_flow}}
     Failed tickers excluded from result (graceful degradation).
     """
     a_tickers = [c["ticker"] for c in companies if c.get("market", "").upper() == "A"]
@@ -26,12 +26,38 @@ async def get_signals_for_companies(
     return results
 
 
+def _parse_net_amount(value: str) -> float | None:
+    """Parse 净额 string like '-8.03亿' or '-6043.55万' to float in 亿."""
+    if not value:
+        return None
+    try:
+        if "亿" in str(value):
+            return float(str(value).replace("亿", ""))
+        if "万" in str(value):
+            return round(float(str(value).replace("万", "")) / 10000, 4)
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
 async def _fetch_a_share(
     tickers: list[str],
 ) -> dict[str, dict[str, float | None]]:
     import akshare as ak
 
     results: dict[str, dict[str, float | None]] = {}
+
+    # Fetch real-time fund flow for all stocks once (同花顺 即时 data)
+    fund_flow_map: dict[str, float] = {}
+    try:
+        ff_df = ak.stock_fund_flow_individual(symbol="即时")
+        for _, row in ff_df.iterrows():
+            code = str(row["股票代码"])
+            net = _parse_net_amount(row.get("净额"))
+            if net is not None:
+                fund_flow_map[code] = net
+    except Exception:
+        pass
 
     for ticker in tickers:
         # Strip exchange suffix for matching: "600584.SH" → "600584"
@@ -75,11 +101,14 @@ async def _fetch_a_share(
             # rsi_14
             rsi = _calc_rsi(close, 14)
 
+            fund_flow = fund_flow_map.get(clean_ticker)
+
             results[ticker] = {
                 "return_1m": round(ret_1m, 1),
                 "turnover_pct": turnover_pct,
                 "volume_ratio": vol_ratio,
                 "rsi_14": rsi,
+                "fund_flow": fund_flow,
             }
         except Exception:
             continue
@@ -115,6 +144,7 @@ async def _fetch_us(
                 "turnover_pct": None,  # yfinance no turnover data
                 "volume_ratio": vol_ratio,
                 "rsi_14": rsi,
+                "fund_flow": None,  # yfinance no real-time fund flow
             }
         except Exception:
             continue
@@ -160,6 +190,8 @@ def format_signals_for_prompt(
             parts.append(f"量比 {s['volume_ratio']}x")
         if s.get("rsi_14") is not None:
             parts.append(f"RSI-14 {s['rsi_14']}")
+        if s.get("fund_flow") is not None:
+            parts.append(f"主力净流 {s['fund_flow']:+.2f}亿")
         lines.append("- " + " ".join(parts))
 
     return "\n".join(lines)
