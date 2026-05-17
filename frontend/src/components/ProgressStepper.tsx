@@ -12,13 +12,14 @@ interface ProgressStepperProps {
 }
 
 export default function ProgressStepper({ currentStep }: ProgressStepperProps) {
-  const currentIndex = STEPS.findIndex((s) => currentStep.startsWith(s.key));
+  const isDone = currentStep === "done";
+  const currentIndex = isDone ? STEPS.length : STEPS.findIndex((s) => currentStep.startsWith(s.key));
 
   return (
     <div className="flex items-center gap-2 mb-8">
       {STEPS.map((step, i) => {
-        const isComplete = i < currentIndex;
-        const isActive = i === currentIndex || (i === STEPS.length - 1 && currentStep === "done");
+        const isComplete = isDone || i < currentIndex;
+        const isActive = !isDone && i === currentIndex;
         return (
           <div key={step.key} className="flex items-center gap-2">
             <div
@@ -34,12 +35,12 @@ export default function ProgressStepper({ currentStep }: ProgressStepperProps) {
             </div>
             <span
               className={`text-sm ${
-                isActive ? "text-blue-700 font-medium" : "text-gray-400"
+                isActive ? "text-blue-700 font-medium" : isComplete ? "text-green-600" : "text-gray-400"
               }`}
             >
               {step.label}
             </span>
-            {i < STEPS.length - 1 && <div className="w-8 h-px bg-gray-300" />}
+            {i < STEPS.length - 1 && <div className={`w-8 h-px ${isComplete ? "bg-green-400" : "bg-gray-300"}`} />}
           </div>
         );
       })}

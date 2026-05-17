@@ -20,11 +20,13 @@ function getNeighborhood(nodeId: string, adj: Map<string, Set<string>>, nodeType
   const clickedType = nodeTypes.get(nodeId);
   for (const n1 of adj.get(nodeId) || []) {
     nb.add(n1);
-    // 2-hop only when clicking Material/Equipment (to reach Company via Technology)
-    // For Company/Theme/Technology, 1-hop is enough
+    // 2-hop only when clicking Material/Equipment: reach Company via Technology
+    // Only expand from Technology to Company — not to sibling materials/equipment
     if (clickedType === "Material" || clickedType === "Equipment") {
       if (nodeTypes.get(n1) === "Technology") {
-        for (const n2 of adj.get(n1) || []) nb.add(n2);
+        for (const n2 of adj.get(n1) || []) {
+          if (nodeTypes.get(n2) === "Company") nb.add(n2);
+        }
       }
     }
   }
@@ -34,7 +36,7 @@ function getNeighborhood(nodeId: string, adj: Map<string, Set<string>>, nodeType
 export default function IndustryChainGraph({ data }: Props) {
   const [fullscreen, setFullscreen] = useState(false);
   const [expandedTechs, setExpandedTechs] = useState<Set<string>>(new Set());
-  const [showCompanies, setShowCompanies] = useState(false);
+  const [showCompanies, setShowCompanies] = useState(true);
   const [highlightNode, setHighlightNode] = useState<string | null>(null);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
