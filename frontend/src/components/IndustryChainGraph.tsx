@@ -130,7 +130,7 @@ export default function IndustryChainGraph({ data }: Props) {
   // Wheel zoom (handles scroll + Mac trackpad pinch via ctrlKey)
   useEffect(() => {
     const el=containerRef.current; if(!el)return;
-    const onWheel=(e:WheelEvent)=>{e.preventDefault();const f=e.ctrlKey?Math.exp(-e.deltaY/100):(e.deltaY>0?0.9:1.1);setZoom((z)=>Math.min(5,Math.max(0.1,z*f)));};
+    const onWheel=(e:WheelEvent)=>{e.preventDefault();const f=e.ctrlKey?Math.exp(-e.deltaY/50):(e.deltaY>0?0.9:1.1);setZoom((z)=>Math.min(5,Math.max(0.1,z*f)));};
     el.addEventListener("wheel",onWheel,{passive:false});
     return ()=>el.removeEventListener("wheel",onWheel);
   }, []);
@@ -159,7 +159,7 @@ export default function IndustryChainGraph({ data }: Props) {
   return (
     <div className={containerClass}>
       <div className={`flex-1 overflow-hidden ${fullscreen?"":"h-full"}`}>
-        <div ref={containerRef} className="w-full h-full overflow-hidden cursor-grab active:cursor-grabbing select-none" style={{touchAction:"none"}} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+        <div ref={containerRef} className="w-full h-full overflow-hidden cursor-grab active:cursor-grabbing select-none" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
           <div style={{transform:`translate(${pan.x}px,${pan.y}px) scale(${zoom})`,transformOrigin:"0 0"}}>
             <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{width:svgW,height:svgH,minWidth:svgW}} onClick={()=>setHighlightNode(null)}>
               {layout.links.map((link,i)=>{
