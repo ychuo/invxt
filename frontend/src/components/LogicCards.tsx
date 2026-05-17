@@ -30,12 +30,21 @@ export default function LogicCards({ companies }: Props) {
               <span className="text-[18px] font-bold text-[#0f172a]">{c.company_name}</span>
               <span className="text-[10px] text-[#94a3b8] font-mono">{c.ticker}</span>
             </div>
-            <div className="flex items-center gap-2 mb-2.5">
+            <div className="flex items-center gap-2 mb-2.5 flex-wrap">
               <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
                 c.market === "A" ? "bg-[#fef2f2] text-[#dc2626]" : "bg-[#eff6ff] text-[#2563eb]"
               }`}>
                 {c.market === "A" ? "A股" : "美股"}
               </span>
+              {c.revenue_tier && (
+                <span className={`text-[9px] px-1.5 py-0.5 rounded border font-bold ${
+                  c.revenue_tier === "core" ? "bg-[#f0fdfa] text-[#0f766e] border-[#5eead4]" :
+                  c.revenue_tier === "important" ? "bg-[#fefce8] text-[#a16207] border-[#fde047]" :
+                  "bg-[#f8fafc] text-[#64748b] border-[#e2e8f0]"
+                }`}>
+                  {c.revenue_tier === "core" ? "核心业务" : c.revenue_tier === "important" ? "重要业务" : c.revenue_tier === "marginal" ? "边缘业务" : "概念"}
+                </span>
+              )}
             </div>
             <ScoreBar score={c.exposure_score} />
           </div>

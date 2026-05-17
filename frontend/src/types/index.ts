@@ -43,10 +43,12 @@ export interface ScoredCompany {
   ticker: string;
   market: "A" | "US";
   exposure_score: number;
+  revenue_tier: "core" | "important" | "marginal" | "concept";
+  market_awareness: "priced_in" | "partially_recognized" | "under_the_radar";
   dimensions: {
-    product_relevance: number;
-    revenue_elasticity: number;
-    chain_criticality: number;
+    industry_purity: number;
+    earnings_elasticity: number;
+    expectation_gap: number;
     competitive_moat: number;
     market_awareness: number;
   };

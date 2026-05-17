@@ -3,45 +3,84 @@ from backend.services.llm_client import LLMClient
 from backend.kg.neo4j_client import Neo4jClient
 from backend.kg.schemas import Relation, RelationType
 
-# Score mapping: rank → score (percentile-based, top gets 95, bottom gets 15)
-def _rank_to_score(rank: int, total: int) -> int:
-    if total <= 1:
-        return 75
-    return round(95 - (rank - 1) / (total - 1) * 80)
+# Revenue tier → base exposure score
+REVENUE_MAP = {
+    "core": 90,        # 核心业务，收入占比 >30%
+    "important": 60,   # 重要业务，收入占比 10-30%
+    "marginal": 30,    # 边缘业务，收入占比 5-10%
+    "concept": 10,     # 概念阶段，收入占比 <5%
+}
 
-SYSTEM_PROMPT = """你是一个投资主题暴露度评估专家。给定一个主题和一组公司，你需要按受益程度从高到低排序。
+# Market awareness → discount multiplier
+# High awareness = already priced in = lower investment value
+AWARENESS_DISCOUNT = {
+    "priced_in": 0.5,              # 市场已充分定价
+    "partially_recognized": 0.8,   # 部分认知
+    "under_the_radar": 1.0,        # 市场认知不足
+}
 
-不需要打具体分数。只需要排出顺序——哪家公司最受益排第1，哪家只是蹭概念排最后。
 
-判断标准：
-- 产业链绝对龙头、主营直接对应、主题爆发显著拉动业绩 → 排前面
-- 有实质业务关联但非最核心 → 排中间
-- 纯概念炒作、关联极弱 → 排最后
+def _compute_scores(companies: list[dict]) -> list[dict]:
+    """Algorithm computes scores from LLM-extracted tiers."""
+    for c in companies:
+        revenue = REVENUE_MAP.get(c.get("revenue_tier", "concept"), 10)
+        discount = AWARENESS_DISCOUNT.get(c.get("market_awareness", "priced_in"), 0.5)
 
-输出严格的 JSON 数组格式（按受益程度从高到低排序）：
+        c["exposure_score"] = round(revenue * discount)
+        c["dimensions"] = {
+            "industry_purity": revenue,
+            "earnings_elasticity": revenue,
+            "expectation_gap": round(discount * 100),
+            "competitive_moat": 50,
+            "market_awareness": round(discount * 100),
+        }
+
+    companies.sort(key=lambda c: c["exposure_score"], reverse=True)
+    return companies
+
+
+SYSTEM_PROMPT = """你是一个投资主题产业链分析专家。给定一个主题和一组公司，你需要对每家公司提取关键信息。
+
+不需要打分或排序。只需要诚实提取每家公司关于这个主题的结构化信息。
+
+对每家公司判断三个东西：
+
+1. **revenue_tier** — 主题关联的业务在公司收入中的占比等级：
+   - "core": 核心业务，收入占比预计 >30%，主题爆发公司实质受益
+   - "important": 重要关联，收入占比 10-30%，有实质业务但非最核心
+   - "marginal": 边缘关联，收入占比 5-10%，有一定关联但弹性有限
+   - "concept": 概念阶段，收入占比 <5%，更多是市场联想而非实质业务
+
+2. **market_awareness** — 市场对这层关联的认知程度：
+   - "priced_in": 市场已充分认知并定价，相关信息已在股价中反映
+   - "partially_recognized": 部分认知，市场有了解但未完全定价
+   - "under_the_radar": 认知不足，市场尚未充分挖掘这层关联
+
+3. 此外还需要：
+   - investment_logic: 详细投资逻辑（3-5句）
+   - key_variables: 关键变量列表，每个有 name 和 detail
+   - risks: 风险列表，每个有 risk 和 detail
+
+输出严格的 JSON 数组格式：
 [
   {
     "company_name": "公司名",
     "ticker": "代码",
     "market": "A/US",
-    "investment_logic": "详细投资逻辑：包括产品/技术/产能优势、产业链卡位、客户绑定关系、订单弹性，3-5句话写清楚",
+    "revenue_tier": "core/important/marginal/concept",
+    "market_awareness": "priced_in/partially_recognized/under_the_radar",
+    "investment_logic": "详细投资逻辑：包括产品/技术/产能优势、产业链卡位、客户绑定关系、订单弹性，3-5句话",
     "key_variables": [
-      {"name": "关键变量", "detail": "为什么重要、当前状态、什么变化会触发价值重估"},
-      {"name": "另一个变量", "detail": "跟踪方法、影响路径"}
+      {"name": "关键变量", "detail": "为什么重要、当前状态、什么变化会触发价值重估"}
     ],
     "risks": [
-      {"risk": "风险", "detail": "具体场景、发生可能性、对公司的影响程度"},
-      {"risk": "另一个风险", "detail": "预警信号、如何判断风险是否临近"}
+      {"risk": "风险", "detail": "具体场景、发生可能性、对公司的影响程度"}
     ]
   }
 ]
 
 规则：
-- 数组顺序就是排名，第1个最受益，最后1个蹭概念
-- 排名要有区分度，不要很多公司挤在同一位置
-- investment_logic 必须写到位，让人读完能理解投资逻辑链条
-- key_variables 每个变量的 detail 是核心，要写清楚怎么跟踪
-- risks 每个风险的 detail 要具体，不是简单复述风险名
+- revenue_tier 和 market_awareness 必须严格使用给定的枚举值
 - 只输出 JSON 数组，不要其他文字"""
 
 
@@ -61,31 +100,17 @@ class ScoringAgent:
 公司列表（无特定顺序）：
 {json.dumps(companies, ensure_ascii=False, indent=2)}
 
-请按受益程度从高到低排序。""",
+请提取每家公司的结构化信息。""",
             temperature=0,
             max_tokens=16384,
         )
 
-        ranked = result if isinstance(result, list) else []
-        total = len(ranked)
-
-        for i, c in enumerate(ranked):
-            rank = i + 1
-            score = _rank_to_score(rank, total)
-            c["exposure_score"] = score
-            c["dimensions"] = {
-                "product_relevance": score,
-                "revenue_elasticity": score,
-                "chain_criticality": score,
-                "competitive_moat": score,
-                "market_awareness": score,
-            }
-        return ranked
+        extracted = result if isinstance(result, list) else []
+        return _compute_scores(extracted)
 
     def write_to_graph(self, theme_name: str, scored_companies: list[dict]):
         from backend.kg.schemas import CompanyEntity, Market
         for company in scored_companies:
-            # Create company node first
             try:
                 c = CompanyEntity(
                     name=company["company_name"],
@@ -95,7 +120,6 @@ class ScoringAgent:
                 self._neo4j.merge_entity(c)
             except Exception:
                 pass
-            # Create exposure relationship
             rel = Relation(
                 from_name=company["company_name"],
                 to_name=theme_name,
