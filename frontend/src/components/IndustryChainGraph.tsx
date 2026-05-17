@@ -94,9 +94,9 @@ export default function IndustryChainGraph({ data }: Props) {
     const idxMap=new Map<string,number>(); nodes.forEach((n,i)=>idxMap.set(n.id,i));
     const slinks:{source:number;target:number;value:number}[]=[],linkMeta:{edgeType:string}[]=[];
     for(const l of links){const si=idxMap.get(l.source),ti=idxMap.get(l.target);if(si!==undefined&&ti!==undefined){slinks.push({source:si,target:ti,value:l.value});linkMeta.push({edgeType:l.edgeType});}}
-    const w=Math.max(1200,300*4),h=Math.max(700,nodes.length*26);
-    const result=sankey<any,any>().nodeWidth(20).nodePadding(16).extent([[0,0],[w,h]]).nodeAlign(sankeyJustify).iterations(32)({nodes:nodes.map(n=>({...n})),links:slinks});
-    const colWidth=w/4; for(const node of result.nodes){const col=node.column??0;node.x0=col*colWidth;node.x1=node.x0+20;}
+    const w=Math.max(1400,350*4),h=Math.max(900,nodes.length*30);
+    const result=sankey<any,any>().nodeWidth(20).nodePadding(24).extent([[0,0],[w,h]]).nodeAlign(sankeyJustify).iterations(32)({nodes:nodes.map(n=>({...n})),links:slinks});
+    const colWidth=w/4.5; for(const node of result.nodes){const col=node.column??0;node.x0=col*colWidth;node.x1=node.x0+20;}
     return {nodes:result.nodes,links:result.links.map((l:any,i:number)=>({...l,edgeType:linkMeta[i]?.edgeType??""})),width:w,height:h};
   }, [sankeyData]);
 
@@ -127,12 +127,19 @@ export default function IndustryChainGraph({ data }: Props) {
   const handleMouseMove = useCallback((e: React.MouseEvent) => { if(!dragging.current)return; setPan({x:e.clientX-dragStart.current.x,y:e.clientY-dragStart.current.y}); }, []);
   const handleMouseUp = useCallback(() => { dragging.current=false; }, []);
 
-  // Wheel zoom (handles scroll + Mac trackpad pinch via ctrlKey)
+  // Wheel zoom + Safari gesture pinch
+  const zoomRef2 = useRef(zoom); zoomRef2.current = zoom;
   useEffect(() => {
     const el=containerRef.current; if(!el)return;
     const onWheel=(e:WheelEvent)=>{e.preventDefault();const f=e.ctrlKey?(e.deltaY>0?0.93:1.07):(e.deltaY>0?0.9:1.1);setZoom((z)=>Math.min(5,Math.max(0.1,z*f)));};
+    // Safari gesture events
+    let gs=1;
+    const onGestureStart=(e:any)=>{e.preventDefault();gs=zoomRef2.current;};
+    const onGestureChange=(e:any)=>{e.preventDefault();setZoom(Math.min(5,Math.max(0.1,gs*e.scale)));};
     el.addEventListener("wheel",onWheel,{passive:false});
-    return ()=>el.removeEventListener("wheel",onWheel);
+    el.addEventListener("gesturestart",onGestureStart);
+    el.addEventListener("gesturechange",onGestureChange);
+    return ()=>{el.removeEventListener("wheel",onWheel);el.removeEventListener("gesturestart",onGestureStart);el.removeEventListener("gesturechange",onGestureChange);};
   }, []);
 
   // Touch pinch zoom — use ref for current zoom to avoid stale closure
