@@ -98,15 +98,25 @@ export default function IndustryChainGraph({ data }: Props) {
     const cols = [0,0,0,0];
     for (const n of nodes) cols[n.column] = (cols[n.column]||0) + 1;
     const maxCol = Math.max(...cols);
-    const h = Math.max(900, maxCol * 38);
+    const h = Math.max(1000, maxCol * 50);
     const w = Math.max(1400, 380 * 4);
     const result=sankey<any,any>().nodeWidth(20).nodePadding(28).extent([[0,0],[w,h]]).nodeAlign(sankeyJustify).iterations(32)({nodes:nodes.map(n=>({...n})),links:slinks});
     const colWidth=w/4.5;
-    // Force equal vertical spacing within each column to prevent overlap
+    // Assign x positions + equal y spacing per column, update link endpoints
     const colNodes: any[][] = [[],[],[],[]];
     for(const node of result.nodes){const col=node.column??0;node.x0=col*colWidth;node.x1=node.x0+20;colNodes[col].push(node);}
-    for(let ci=0;ci<4;ci++){const cn=colNodes[ci];if(cn.length<=1)continue;const th=h-40,step=th/cn.length;
-      for(let i=0;i<cn.length;i++){cn[i].y0=20+i*step;cn[i].y1=20+i*step+Math.max(20,step-8);}}
+    const oldY = new Map<string,{y0:number,y1:number}>();
+    for(const node of result.nodes) oldY.set(node.id??node.name,{y0:node.y0,y1:node.y1});
+    for(let ci=0;ci<4;ci++){const cn=colNodes[ci];if(cn.length<=1)continue;const th=h-60,step=th/cn.length;
+      for(let i=0;i<cn.length;i++){const y=30+i*step;cn[i].y0=y;cn[i].y1=y+Math.max(18,step-12);}}
+    // Sync link endpoints to new node y-positions
+    for(const link of result.links){
+      const src = link.source; const tgt = link.target;
+      if(src && tgt){
+        link.y0 = src.y0 + (src.y1-src.y0)/2;
+        link.y1 = tgt.y0 + (tgt.y1-tgt.y0)/2;
+      }
+    }
     return {nodes:result.nodes,links:result.links.map((l:any,i:number)=>({...l,edgeType:linkMeta[i]?.edgeType??""})),width:w,height:h};
   }, [sankeyData]);
 
