@@ -24,15 +24,24 @@ SYSTEM_PROMPT = """你是一个投资主题暴露度评估专家。给定一个�
     "company_name": "公司名",
     "ticker": "代码",
     "market": "A/US",
-    "investment_logic": "核心逻辑2-3句话",
-    "key_variables": ["关键变量1", "关键变量2"],
-    "risks": ["风险1"]
+    "investment_logic": "详细投资逻辑：包括产品/技术/产能优势、产业链卡位、客户绑定关系、订单弹性，3-5句话写清楚",
+    "key_variables": [
+      {"name": "关键变量", "detail": "为什么重要、当前状态、什么变化会触发价值重估"},
+      {"name": "另一个变量", "detail": "跟踪方法、影响路径"}
+    ],
+    "risks": [
+      {"risk": "风险", "detail": "具体场景、发生可能性、对公司的影响程度"},
+      {"risk": "另一个风险", "detail": "预警信号、如何判断风险是否临近"}
+    ]
   }
 ]
 
 规则：
 - 数组顺序就是排名，第1个最受益，最后1个蹭概念
 - 排名要有区分度，不要很多公司挤在同一位置
+- investment_logic 必须写到位，让人读完能理解投资逻辑链条
+- key_variables 每个变量的 detail 是核心，要写清楚怎么跟踪
+- risks 每个风险的 detail 要具体，不是简单复述风险名
 - 只输出 JSON 数组，不要其他文字"""
 
 
@@ -54,7 +63,7 @@ class ScoringAgent:
 
 请按受益程度从高到低排序。""",
             temperature=0,
-            max_tokens=4096,
+            max_tokens=16384,
         )
 
         ranked = result if isinstance(result, list) else []

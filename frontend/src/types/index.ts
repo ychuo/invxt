@@ -28,6 +28,16 @@ export interface CompanyMapping {
   relevance: string;
 }
 
+export interface KeyVariable {
+  name: string;
+  detail: string;
+}
+
+export interface RiskItem {
+  risk: string;
+  detail: string;
+}
+
 export interface ScoredCompany {
   company_name: string;
   ticker: string;
@@ -41,8 +51,8 @@ export interface ScoredCompany {
     market_awareness: number;
   };
   investment_logic: string;
-  key_variables: string[];
-  risks: string[];
+  key_variables: KeyVariable[];
+  risks: RiskItem[];
 }
 
 export interface SearchResult {
