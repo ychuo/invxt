@@ -94,8 +94,13 @@ export default function IndustryChainGraph({ data }: Props) {
     const idxMap=new Map<string,number>(); nodes.forEach((n,i)=>idxMap.set(n.id,i));
     const slinks:{source:number;target:number;value:number}[]=[],linkMeta:{edgeType:string}[]=[];
     for(const l of links){const si=idxMap.get(l.source),ti=idxMap.get(l.target);if(si!==undefined&&ti!==undefined){slinks.push({source:si,target:ti,value:l.value});linkMeta.push({edgeType:l.edgeType});}}
-    const w=Math.max(1400,350*4),h=Math.max(900,nodes.length*30);
-    const result=sankey<any,any>().nodeWidth(20).nodePadding(24).extent([[0,0],[w,h]]).nodeAlign(sankeyJustify).iterations(32)({nodes:nodes.map(n=>({...n})),links:slinks});
+    // Compute height based on max nodes per column to prevent overlap
+    const cols = [0,0,0,0];
+    for (const n of nodes) cols[n.column] = (cols[n.column]||0) + 1;
+    const maxCol = Math.max(...cols);
+    const h = Math.max(900, maxCol * 38);
+    const w = Math.max(1400, 380 * 4);
+    const result=sankey<any,any>().nodeWidth(20).nodePadding(28).extent([[0,0],[w,h]]).nodeAlign(sankeyJustify).iterations(32)({nodes:nodes.map(n=>({...n})),links:slinks});
     const colWidth=w/4.5; for(const node of result.nodes){const col=node.column??0;node.x0=col*colWidth;node.x1=node.x0+20;}
     return {nodes:result.nodes,links:result.links.map((l:any,i:number)=>({...l,edgeType:linkMeta[i]?.edgeType??""})),width:w,height:h};
   }, [sankeyData]);
