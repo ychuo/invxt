@@ -58,7 +58,15 @@ class LLMClient:
         if not text:
             raise ValueError("Empty response from LLM")
         # Find first [ or { and parse from there
-        start = min((text.find(c) for c in "[{") if text.find(c) >= 0 else [len(text)]))
+        idx_bracket = text.find("[")
+        idx_brace = text.find("{")
+        start = -1
+        if idx_bracket >= 0 and idx_brace >= 0:
+            start = min(idx_bracket, idx_brace)
+        elif idx_bracket >= 0:
+            start = idx_bracket
+        elif idx_brace >= 0:
+            start = idx_brace
         if start > 0:
             text = text[start:]
         try:
