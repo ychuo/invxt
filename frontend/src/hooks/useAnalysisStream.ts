@@ -98,16 +98,18 @@ export function useAnalysisStream() {
       const res = await fetch(`${API_BASE}/theme/${taskId}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (data.status === "completed") {
-        const blocks: Record<string, unknown> = {};
-        if (data.theme) blocks.theme = data.theme;
-        if (data.chain?.length) blocks.chain = data.chain;
-        if (data.companies?.length) blocks.companies = data.companies;
-        if (data.scored?.length) blocks.logic = data.scored;
+      const blocks: Record<string, unknown> = {};
+      if (data.theme) blocks.theme = data.theme;
+      if (data.chain?.length) blocks.chain = data.chain;
+      if (data.companies?.length) blocks.companies = data.companies;
+      if (data.scored?.length) blocks.logic = data.scored;
+      const thinking = (data.thinking || []) as ThinkingEntry[];
+      if (data.status === "completed" || data.status === "running") {
         setState((prev) => ({
           ...prev,
           blocks,
-          status: "done",
+          thinking,
+          status: data.status === "completed" ? "done" : "streaming",
           taskId: taskId,
         }));
       }

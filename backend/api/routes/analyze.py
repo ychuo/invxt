@@ -105,8 +105,9 @@ async def analyze_stream(req: AnalyzeRequest):
     task_id = str(__import__("uuid").uuid4())
     analyzer = AgenticAnalyzer()
 
-    # Accumulate blocks for Redis persistence
+    # Accumulate blocks and thinking for Redis persistence
     blocks: dict[str, object] = {}
+    thinking_entries: list[dict] = []
     status = "running"
 
     async def event_stream():
@@ -131,10 +132,13 @@ async def analyze_stream(req: AnalyzeRequest):
         q: asyncio.Queue = asyncio.Queue()
 
         async def _run():
-            nonlocal status, blocks
+            nonlocal status, blocks, thinking_entries
             try:
                 async for event in analyzer.analyze(req.topic, req.market):
                     await q.put(event)
+                    # Accumulate thinking entries (exclude raw thinking token chunks, they'd be too many)
+                    if event.get("type") in ("tool_call", "tool_result", "conclusion", "correction", "error"):
+                        thinking_entries.append(event)
                     # Persist block updates on conclusion
                     if event.get("type") == "conclusion":
                         block = event.get("block", "")
@@ -143,10 +147,10 @@ async def analyze_stream(req: AnalyzeRequest):
                         except (json.JSONDecodeError, TypeError):
                             content = event.get("content")
                         blocks[block] = content
-                        await _save_state(task_id, req.topic, req.market, blocks, "running")
+                        await _save_state(task_id, req.topic, req.market, blocks, thinking_entries, "running")
                     elif event.get("type") == "correction":
-                        # Re-save after correction too
-                        await _save_state(task_id, req.topic, req.market, blocks, "running")
+                        thinking_entries.append(event)
+                        await _save_state(task_id, req.topic, req.market, blocks, thinking_entries, "running")
             except Exception as e:
                 import sys, traceback
                 print(f"[SSE] analyzer error: {type(e).__name__}: {e}", file=sys.stderr)
@@ -170,13 +174,13 @@ async def analyze_stream(req: AnalyzeRequest):
 
         # Done — persist final state
         status = "completed"
-        await _save_state(task_id, req.topic, req.market, blocks, status)
+        await _save_state(task_id, req.topic, req.market, blocks, thinking_entries, status)
         # Topic-level cache for 24h
         redis = aioredis.from_url(settings.redis_url)
         await redis.setex(
             f"analysis:topic:{req.topic}:{req.market}",
             86400,
-            json.dumps(_build_state(task_id, req.topic, req.market, blocks, status), ensure_ascii=False),
+            json.dumps(_build_state(task_id, req.topic, req.market, blocks, thinking_entries, status), ensure_ascii=False),
         )
         await redis.close()
         yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
@@ -192,14 +196,14 @@ async def analyze_stream(req: AnalyzeRequest):
     )
 
 
-async def _save_state(task_id: str, topic: str, market: str, blocks: dict, status: str):
+async def _save_state(task_id: str, topic: str, market: str, blocks: dict, thinking: list, status: str):
     redis = aioredis.from_url(settings.redis_url)
-    state = _build_state(task_id, topic, market, blocks, status)
+    state = _build_state(task_id, topic, market, blocks, thinking, status)
     await redis.setex(f"analysis:{task_id}", 3600, json.dumps(state, ensure_ascii=False))
     await redis.close()
 
 
-def _build_state(task_id: str, topic: str, market: str, blocks: dict, status: str) -> dict:
+def _build_state(task_id: str, topic: str, market: str, blocks: dict, thinking: list, status: str) -> dict:
     return {
         "task_id": task_id,
         "topic": topic,
@@ -211,5 +215,6 @@ def _build_state(task_id: str, topic: str, market: str, blocks: dict, status: st
         "companies": blocks.get("companies") or [],
         "scored": blocks.get("logic") or [],
         "search": [],
+        "thinking": thinking,
         "error": None,
     }
