@@ -133,24 +133,32 @@ async def analyze_stream(req: AnalyzeRequest):
 
         async def _run():
             nonlocal status, blocks, thinking_entries
+            thinking_buf = ""  # consolidate consecutive thinking events
             try:
                 async for event in analyzer.analyze(req.topic, req.market):
                     await q.put(event)
-                    # Accumulate thinking entries (exclude raw thinking token chunks, they'd be too many)
-                    if event.get("type") in ("tool_call", "tool_result", "conclusion", "correction", "error"):
+                    etype = event.get("type", "")
+                    if etype == "thinking":
+                        thinking_buf += event.get("text", "")
+                    else:
+                        # Flush accumulated thinking before non-thinking event
+                        if thinking_buf.strip():
+                            thinking_entries.append({"type": "thinking", "text": thinking_buf})
+                            thinking_buf = ""
                         thinking_entries.append(event)
-                    # Persist block updates on conclusion
-                    if event.get("type") == "conclusion":
-                        block = event.get("block", "")
-                        try:
-                            content = json.loads(event.get("content", "")) if isinstance(event.get("content"), str) else event.get("content")
-                        except (json.JSONDecodeError, TypeError):
-                            content = event.get("content")
-                        blocks[block] = content
-                        await _save_state(task_id, req.topic, req.market, blocks, thinking_entries, "running")
-                    elif event.get("type") == "correction":
-                        thinking_entries.append(event)
-                        await _save_state(task_id, req.topic, req.market, blocks, thinking_entries, "running")
+                        if etype == "conclusion":
+                            block = event.get("block", "")
+                            try:
+                                content = json.loads(event.get("content", "")) if isinstance(event.get("content"), str) else event.get("content")
+                            except (json.JSONDecodeError, TypeError):
+                                content = event.get("content")
+                            blocks[block] = content
+                            await _save_state(task_id, req.topic, req.market, blocks, thinking_entries, "running")
+                        elif etype == "correction":
+                            await _save_state(task_id, req.topic, req.market, blocks, thinking_entries, "running")
+                # Flush any remaining thinking
+                if thinking_buf.strip():
+                    thinking_entries.append({"type": "thinking", "text": thinking_buf})
             except Exception as e:
                 import sys, traceback
                 print(f"[SSE] analyzer error: {type(e).__name__}: {e}", file=sys.stderr)
