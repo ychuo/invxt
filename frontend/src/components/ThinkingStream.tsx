@@ -249,10 +249,9 @@ export default function ThinkingStream({ entries }: { entries: ThinkingEntry[] }
               padding: "12px 16px",
               marginBottom: 20,
             }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#0f766e", marginBottom: 2 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#0f766e" }}>
                 {"✦"} {BLOCK_CONCLUSION_LABELS[item.block] || item.block}
               </div>
-              <div style={{ fontSize: 10, color: "#99f6e4" }}>已同步到分析报告</div>
             </div>
           );
         }
