@@ -2,9 +2,11 @@ import asyncio
 import json
 import redis.asyncio as aioredis
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from backend.config import settings
 from backend.services.pipeline import AnalysisPipeline, StepStatus
+from backend.services.agentic_analyzer import AgenticAnalyzer
 
 router = APIRouter()
 
@@ -96,3 +98,22 @@ async def create_analysis(req: AnalyzeRequest):
     asyncio.create_task(_cleanup())
 
     return {"task_id": task_id, "topic": req.topic, "market": req.market}
+
+
+@router.post("/analyze/stream")
+async def analyze_stream(req: AnalyzeRequest):
+    analyzer = AgenticAnalyzer()
+
+    async def event_stream():
+        async for event in analyzer.analyze(req.topic, req.market):
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
