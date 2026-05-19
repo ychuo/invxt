@@ -167,12 +167,12 @@ function AnalysisContent() {
         {/* ===== Sticky Nav ===== */}
         <div className="sticky top-0 z-10 bg-white border-b border-[#f0f0f0]" style={{ height: 44, display: "flex", alignItems: "center" }}>
           <div className="max-w-4xl mx-auto flex items-center gap-0 px-6 w-full">
-            <div className="flex gap-0 overflow-x-auto">
-              {NAV_ITEMS.map((item, idx) => (
+            <div className="flex gap-3 overflow-x-auto">
+              {NAV_ITEMS.map((item) => (
                 <button
                   key={item.key}
                   onClick={() => scrollTo(item.key)}
-                  className={`${idx === 0 ? "pl-0 pr-3" : "px-3"} text-[11px] whitespace-nowrap border-b-2 transition-colors h-[44px] ${
+                  className={`text-[11px] whitespace-nowrap border-b-2 transition-colors h-[44px] ${
                     activeNav === item.key
                       ? "text-[#0d9488] font-bold border-[#0d9488]"
                       : "text-[#94a3b8] border-transparent hover:text-[#64748b]"
