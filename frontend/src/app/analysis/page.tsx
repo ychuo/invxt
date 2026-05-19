@@ -64,7 +64,7 @@ function AnalysisContent() {
   const topic = params.get("q") || "";
   const market = params.get("market") || "A";
 
-  const { thinking, blocks, status, error, taskId, start, cancel, loadFromCache } = useAnalysisStream();
+  const { thinking, blocks, status, error, taskId, start, cancel, restore } = useAnalysisStream();
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [activeNav, setActiveNav] = useState("graph");
 
@@ -76,15 +76,15 @@ function AnalysisContent() {
       try {
         const cached = await getAnalysisByTopic(topic, market);
         if (ignore) return;
-        if (cached?.task_id && (cached.status === "completed" || cached.status === "running")) {
-          loadFromCache(cached.task_id);
+        if (cached && (cached.status === "completed" || cached.status === "running")) {
+          restore(cached);
           return;
         }
       } catch {}
       if (!ignore) start(topic, market);
     })();
     return () => { ignore = true; cancel(); };
-  }, [topic, market, start, cancel, loadFromCache]);
+  }, [topic, market, start, cancel, restore]);
 
   // Fetch graph data when chain blocks arrive
   useEffect(() => {
