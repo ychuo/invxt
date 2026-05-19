@@ -198,8 +198,8 @@ export default function ThinkingStream({ entries }: { entries: ThinkingEntry[] }
                 components={{
                   p: ({ children }) => <p style={{ margin: "0 0 8px" }}>{children}</p>,
                   strong: ({ children }) => <strong style={{ color: "#0f172a" }}>{children}</strong>,
-                  ul: ({ children }) => <ul style={{ margin: "4px 0", paddingLeft: 18 }}>{children}</ul>,
-                  ol: ({ children }) => <ol style={{ margin: "4px 0", paddingLeft: 18 }}>{children}</ol>,
+                  ul: ({ children }) => <ul style={{ margin: "4px 0", paddingLeft: 18, listStyle: "disc" }}>{children}</ul>,
+                  ol: ({ children }) => <ol style={{ margin: "4px 0", paddingLeft: 18, listStyle: "decimal" }}>{children}</ol>,
                   li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
                   em: ({ children }) => <em style={{ color: "#64748b" }}>{children}</em>,
                   code: ({ children }) => <code style={{ background: "#f1f5f9", padding: "1px 5px", borderRadius: 4, fontSize: 12, fontFamily: "var(--font-mono)" }}>{children}</code>,
