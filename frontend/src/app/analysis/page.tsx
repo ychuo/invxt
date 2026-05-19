@@ -148,14 +148,16 @@ function AnalysisContent() {
       {/* ===== Left: Thinking Stream ===== */}
       <div style={{ flex: "0 0 50%", borderRight: "1px solid #e5e7eb", background: "#fafbfc", height: "100vh", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "10px 24px", borderBottom: "1px solid #f0f0f0", background: "#fff", display: "flex", alignItems: "baseline", justifyContent: "space-between", minHeight: 44 }}>
-          <span style={{ fontFamily: "var(--font-serif)", fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
-            思考过程
+          <span style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 700, color: "#111" }}>
+            Inv<span style={{ background: "linear-gradient(135deg, #0d9488, #14b8a6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>X</span>t
+            <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", color: "#94a3b8", fontWeight: 600, marginLeft: 10 }}>
+              思考过程
+            </span>
           </span>
           <span style={{ fontFamily: "var(--font-serif)", fontSize: 11, color: status === "streaming" ? "#d97706" : status === "done" ? "#0d9488" : "#94a3b8" }}>
             {status === "streaming" && "分析中"}
             {status === "done" && "完成"}
             {status === "error" && "中断"}
-            {status === "idle" && "等待中"}
           </span>
         </div>
         <ThinkingStream entries={thinking} />
@@ -166,10 +168,6 @@ function AnalysisContent() {
         {/* ===== Sticky Nav ===== */}
         <div className="sticky top-0 z-10 bg-white border-b border-[#f0f0f0]">
           <div className="max-w-4xl mx-auto flex items-center gap-0 px-6">
-            <span className="text-[15px] font-bold text-[#111] py-2.5 whitespace-nowrap">
-              Inv<span style={{ background: "linear-gradient(135deg, #0d9488, #14b8a6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>X</span>t
-            </span>
-            <span className="text-[#e5e7eb] mx-3.5">|</span>
             <div className="flex gap-0 overflow-x-auto flex-1">
               {NAV_ITEMS.map((item) => (
                 <button
