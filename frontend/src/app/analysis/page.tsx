@@ -24,7 +24,7 @@ function GraphIcon() {
   );
 }
 
-function BlockHeader({ label, badge, meta, link }: { label: string; badge?: string; meta?: string; link?: { onClick: () => void } }) {
+function BlockHeader({ label, badge, meta }: { label: string; badge?: string; meta?: string }) {
   return (
     <div className="flex items-center gap-2.5 py-3 border-b border-[#f0f0f0] mb-3">
       <span className="text-[10px] uppercase tracking-widest text-[#94a3b8] font-bold">{label}</span>
@@ -36,12 +36,6 @@ function BlockHeader({ label, badge, meta, link }: { label: string; badge?: stri
         }`}>{badge}</span>
       )}
       {meta && <span className="text-[10px] text-[#cbd5e1]">{meta}</span>}
-      <div className="flex-1" />
-      {link && (
-        <button onClick={link.onClick} className="text-[10px] text-[#0d9488] hover:text-[#0f766e] font-bold flex items-center gap-1 transition-colors whitespace-nowrap">
-          推理过程 <span>→</span>
-        </button>
-      )}
     </div>
   );
 }
@@ -51,14 +45,6 @@ const NAV_ITEMS = [
   { key: "table", label: "公司" },
   { key: "cards", label: "逻辑" },
 ];
-
-// Polyfill for findLastIndex (target is es5)
-function findLastIndex<T>(arr: T[], predicate: (item: T) => boolean): number {
-  for (let i = arr.length - 1; i >= 0; i--) {
-    if (predicate(arr[i])) return i;
-  }
-  return -1;
-}
 
 export default function AnalysisPage() {
   return (
@@ -81,8 +67,6 @@ function AnalysisContent() {
   const { thinking, blocks, status, error, taskId, start, cancel, loadFromCache } = useAnalysisStream();
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [activeNav, setActiveNav] = useState("graph");
-  const [flashBlock, setFlashBlock] = useState<string | null>(null);
-  const [highlightedEntry, setHighlightedEntry] = useState<number | null>(null);
 
   // On mount: check Redis cache first, otherwise start new stream
   useEffect(() => {
@@ -108,28 +92,6 @@ function AnalysisContent() {
       getGraph(topic).then(setGraphData).catch(() => {});
     }
   }, [blocks.chain, topic]);
-
-  // Flash block when conclusion arrives
-  useEffect(() => {
-    const lastEntry = thinking[thinking.length - 1];
-    if (lastEntry?.type === "conclusion") {
-      setFlashBlock(lastEntry.block);
-      const timer = setTimeout(() => setFlashBlock(null), 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [thinking]);
-
-  // Handle block click -> highlight thinking entry
-  const handleBlockClick = useCallback((block: string) => {
-    const idx = findLastIndex(
-      thinking,
-      (e) => e.type === "conclusion" && e.block === block
-    );
-    if (idx >= 0) {
-      setHighlightedEntry(idx);
-      setTimeout(() => setHighlightedEntry(null), 2000);
-    }
-  }, [thinking]);
 
   // IntersectionObserver for sticky nav
   useEffect(() => {
@@ -193,11 +155,7 @@ function AnalysisContent() {
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#14b8a6" }} />
           )}
         </div>
-        <ThinkingStream
-          entries={thinking}
-          onBlockClick={handleBlockClick}
-          highlightedEntry={highlightedEntry}
-        />
+        <ThinkingStream entries={thinking} />
       </div>
 
       {/* ===== Right: Analysis Report ===== */}
@@ -247,24 +205,21 @@ function AnalysisContent() {
 
           {/* ===== Block: Theme Summary ===== */}
           {blocks.theme != null && (
-            <section id="theme" className="mb-6" style={flashBlock === "theme" ? { boxShadow: "0 0 0 2px #14b8a6", borderRadius: 10, transition: "box-shadow 0.3s" } : {}}>
-              <BlockHeader label="主题理解" badge="完成" link={{ onClick: () => handleBlockClick("theme") }} />
+            <section id="theme" className="mb-6">
+              <BlockHeader label="主题理解" badge="完成" />
               <ThemeSummary theme={blocks.theme as ThemeResult} />
             </section>
           )}
 
           {/* ===== Block: Chain Graph ===== */}
           {blocks.chain != null && (
-            <section id="graph" className="mb-6" style={flashBlock === "chain" ? { boxShadow: "0 0 0 2px #14b8a6", borderRadius: 10, transition: "box-shadow 0.3s" } : {}}>
+            <section id="graph" className="mb-6">
               <div className="flex items-center justify-between py-3 border-b border-[#f0f0f0] mb-3">
                 <div className="flex items-center gap-2.5">
                   <span className="text-[10px] uppercase tracking-widest text-[#94a3b8] font-bold">产业链图谱</span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#dcfce7] text-[#166534]">完成</span>
                   {graphData && <span className="text-[10px] text-[#cbd5e1]">{graphData.nodes.length} 节点 · {graphData.edges.length} 连线</span>}
                 </div>
-                <button onClick={() => handleBlockClick("chain")} className="text-[10px] text-[#0d9488] hover:text-[#0f766e] font-bold flex items-center gap-1 transition-colors whitespace-nowrap">
-                  推理过程 <span>→</span>
-                </button>
               </div>
               <IndustryChainGraph data={graphData} />
             </section>
@@ -272,11 +227,10 @@ function AnalysisContent() {
 
           {/* ===== Block: Company Table ===== */}
           {blocks.companies != null && (
-            <section id="table" className="mb-6" style={flashBlock === "companies" ? { boxShadow: "0 0 0 2px #14b8a6", borderRadius: 10, transition: "box-shadow 0.3s" } : {}}>
+            <section id="table" className="mb-6">
               <BlockHeader
                 label="核心公司映射"
                 badge={blocks.logic != null ? `${(blocks.logic as any[]).length} 家` : "评分中..."}
-                link={{ onClick: () => handleBlockClick("companies") }}
               />
               <CompanyTable companies={
                 blocks.logic != null
@@ -299,12 +253,11 @@ function AnalysisContent() {
 
           {/* ===== Block: Logic Cards ===== */}
           {blocks.logic != null && (
-            <section id="cards" className="mb-8" style={flashBlock === "logic" ? { boxShadow: "0 0 0 2px #14b8a6", borderRadius: 10, transition: "box-shadow 0.3s" } : {}}>
+            <section id="cards" className="mb-8">
               <BlockHeader
                 label="投资逻辑卡片"
                 badge={`${Math.min(3, (blocks.logic as any[]).length)} 家`}
                 meta="仅展示前三"
-                link={{ onClick: () => handleBlockClick("logic") }}
               />
               <LogicCards companies={blocks.logic as ScoredCompany[]} />
             </section>
