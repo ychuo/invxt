@@ -151,11 +151,13 @@ function AnalysisContent() {
           <span style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 700, color: "#111", lineHeight: "44px" }}>
             Inv<span style={{ background: "linear-gradient(135deg, #0d9488, #14b8a6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>X</span>t
           </span>
-          <span style={{
-            width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
-            background: status === "error" ? "#dc2626" : status === "done" ? "#0d9488" : "#14b8a6",
-            animation: status === "streaming" ? "pulse 1.5s ease-in-out infinite" : "none",
-          }} />
+          {(status === "streaming" || status === "error") && (
+            <span style={{
+              width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+              background: status === "error" ? "#dc2626" : "#14b8a6",
+              animation: status === "streaming" ? "pulse 1.5s ease-in-out infinite" : "none",
+            }} />
+          )}
         </div>
         <ThinkingStream entries={thinking} />
       </div>
@@ -164,7 +166,7 @@ function AnalysisContent() {
       <div style={{ flex: "0 0 52%", overflowY: "auto", background: "#fff", height: "100vh", minWidth: 480 }}>
         {/* ===== Sticky Nav ===== */}
         <div className="sticky top-0 z-10 bg-white border-b border-[#f0f0f0]" style={{ height: 44, display: "flex", alignItems: "center" }}>
-          <div className="max-w-4xl mx-auto flex items-center gap-0 px-6 w-full">
+          <div className="max-w-4xl mx-auto flex items-center gap-0 pr-6 w-full">
             <div className="flex gap-0 overflow-x-auto">
               {NAV_ITEMS.map((item) => (
                 <button
