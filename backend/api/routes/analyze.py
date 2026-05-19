@@ -101,8 +101,8 @@ async def create_analysis(req: AnalyzeRequest):
 
 
 @router.post("/analyze/stream")
-async def analyze_stream(req: AnalyzeRequest):
-    analyzer = AgenticAnalyzer()
+async def analyze_stream(req: AnalyzeRequest, mock: bool = False):
+    analyzer = AgenticAnalyzer(mock_search=mock)
 
     async def event_stream():
         q: asyncio.Queue = asyncio.Queue()
@@ -111,8 +111,11 @@ async def analyze_stream(req: AnalyzeRequest):
             try:
                 async for event in analyzer.analyze(req.topic, req.market):
                     await q.put(event)
-            except Exception:
-                pass
+            except Exception as e:
+                import sys, traceback
+                print(f"[SSE] analyzer error: {type(e).__name__}: {e}", file=sys.stderr)
+                traceback.print_exc(file=sys.stderr)
+                await q.put({"type": "error", "message": f"{type(e).__name__}: {e}"})
             finally:
                 await q.put(None)  # sentinel
 

@@ -138,14 +138,20 @@ emit_conclusion 的 content 格式要求：
 
 
 class AgenticAnalyzer:
-    def __init__(self):
+    def __init__(self, mock_search: bool = False):
         self._llm = LLMClient()
-        self._search = SearchClient()
+        self._search = SearchClient() if not mock_search else None
         self._neo4j = Neo4jClient()
         self._vector = VectorStore()
+        self._mock_search = mock_search
 
     async def _execute_tool(self, name: str, args: dict) -> str:
         if name == "web_search":
+            if self._mock_search:
+                return json.dumps([
+                    {"title": "Mock: " + args.get("query", ""), "url": "https://example.com",
+                     "content": "这是模拟搜索结果。HBM产业链包括上游设备和材料、中游先进封装、下游AI服务器。"},
+                ], ensure_ascii=False)
             results = await self._search.search(
                 args["query"], max_results=args.get("max_results", 5)
             )
@@ -196,49 +202,58 @@ class AgenticAnalyzer:
             tool_calls_buf: list[dict] = []
             current_tool_idx = -1
 
-            async for chunk in stream:
-                delta = chunk.choices[0].delta
+            try:
+                async for chunk in stream:
+                    delta = chunk.choices[0].delta
 
-                # Reasoning content (thinking stream — stream to frontend)
-                reasoning = (
-                    getattr(delta, "reasoning_content", None)
-                    or getattr(delta, "reasoning", None)
-                    or ""
-                )
-                if reasoning:
-                    full_reasoning += reasoning
-                    yield {"type": "thinking", "text": reasoning}
+                    # Reasoning content (thinking stream — stream to frontend)
+                    reasoning = (
+                        getattr(delta, "reasoning_content", None)
+                        or getattr(delta, "reasoning", None)
+                        or ""
+                    )
+                    if reasoning:
+                        full_reasoning += reasoning
+                        yield {"type": "thinking", "text": reasoning}
 
-                # Regular content
-                content = delta.content or ""
-                if content:
-                    full_content += content
+                    # Regular content
+                    content = delta.content or ""
+                    if content:
+                        full_content += content
 
-                # Tool calls
-                if delta.tool_calls:
-                    for tc in delta.tool_calls:
-                        if tc.index is not None and tc.index > current_tool_idx:
-                            current_tool_idx = tc.index
-                            tool_calls_buf.append(
-                                {
-                                    "id": tc.id or "",
-                                    "function": {
-                                        "name": tc.function.name or "",
-                                        "arguments": "",
-                                    },
-                                }
-                            )
-                        if tc.function and tc.function.arguments:
-                            idx = tc.index if tc.index is not None else current_tool_idx
-                            if idx < len(tool_calls_buf):
-                                tool_calls_buf[idx]["function"][
-                                    "arguments"
-                                ] += tc.function.arguments
+                    # Tool calls
+                    if delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            if tc.index is not None and tc.index > current_tool_idx:
+                                current_tool_idx = tc.index
+                                tool_calls_buf.append(
+                                    {
+                                        "id": tc.id or "",
+                                        "function": {
+                                            "name": tc.function.name or "",
+                                            "arguments": "",
+                                        },
+                                    }
+                                )
+                            if tc.function and tc.function.arguments:
+                                idx = tc.index if tc.index is not None else current_tool_idx
+                                if idx < len(tool_calls_buf):
+                                    tool_calls_buf[idx]["function"][
+                                        "arguments"
+                                    ] += tc.function.arguments
+
+            except Exception as e:
+                print(f"[AgenticAnalyzer] Step {step+1} stream ERROR: {type(e).__name__}: {e}", file=sys.stderr)
+                yield {"type": "error", "message": f"LLM stream error: {type(e).__name__}: {e}"}
+                break
 
             # Process tool calls
             if tool_calls_buf:
                 print(f"[AgenticAnalyzer] Step {step+1}: got {len(tool_calls_buf)} tool calls: {[tc['function']['name'] for tc in tool_calls_buf]}", file=sys.stderr)
                 msg = {"role": "assistant", "content": full_content or None}
+                # DeepSeek V4 requires reasoning_content when tool_calls are present
+                if full_reasoning:
+                    msg["reasoning_content"] = full_reasoning
                 msg["tool_calls"] = [
                     {
                         "id": tc["id"],
