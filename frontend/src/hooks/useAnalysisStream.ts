@@ -3,7 +3,7 @@ import { useState, useRef, useCallback } from "react";
 
 export type ThinkingEntry =
   | { type: "meta"; task_id: string }
-  | { type: "reasoning"; text: string }
+  | { type: "thinking"; text: string }
   | { type: "tool_call"; name: string; args: Record<string, unknown> }
   | { type: "tool_result"; name: string; result: string }
   | { type: "conclusion"; block: string; content: string }

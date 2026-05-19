@@ -58,8 +58,8 @@ export default function ThinkingStream({
       overflowY: "auto",
     }}>
       {entries.map((entry, i) => {
-        // --- Reasoning text ---
-        if (entry.type === "reasoning") {
+        // --- Thinking text ---
+        if (entry.type === "thinking") {
           const isHighlighted = highlightedEntry === i;
           return (
             <div key={i} style={{
