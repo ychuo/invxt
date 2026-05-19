@@ -176,7 +176,7 @@ export default function ThinkingStream({ entries }: { entries: ThinkingEntry[] }
       fontSize: 13,
       lineHeight: 1.85,
       color: "#475569",
-      padding: "16px 18px 32px",
+      padding: "20px 24px 32px",
       height: "100%",
       overflowY: "auto",
     }}>
@@ -192,8 +192,9 @@ export default function ThinkingStream({ entries }: { entries: ThinkingEntry[] }
         if (item.type === "thinking") {
           const isLast = i === lastThinkingIdx && isStreaming;
           return (
-            <div key={item.key} style={{ marginBottom: 20, fontSize: 14, lineHeight: 1.9, color: "#334155" }}>
-              <ReactMarkdown
+            <div key={item.key} style={{ marginBottom: 20, paddingLeft: 14, borderLeft: "2px solid #e5e7eb" }}>
+              <div style={{ fontSize: 14, lineHeight: 1.9, color: "#334155" }}>
+                <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
                   p: ({ children }) => <p style={{ margin: "0 0 8px" }}>{children}</p>,
@@ -213,14 +214,15 @@ export default function ThinkingStream({ entries }: { entries: ThinkingEntry[] }
               >
                 {item.text}
               </ReactMarkdown>
-              {isLast && (
-                <span style={{
-                  display: "inline-block", width: 2, height: 14,
-                  background: "#0d9488", marginLeft: 2,
-                  verticalAlign: "text-bottom",
-                  animation: "blink 0.8s step-end infinite",
-                }} />
-              )}
+                {isLast && (
+                  <span style={{
+                    display: "inline-block", width: 2, height: 14,
+                    background: "#0d9488", marginLeft: 2,
+                    verticalAlign: "text-bottom",
+                    animation: "blink 0.8s step-end infinite",
+                  }} />
+                )}
+              </div>
             </div>
           );
         }

@@ -147,12 +147,15 @@ function AnalysisContent() {
     <main className="h-screen flex overflow-hidden" style={{ fontFamily: "var(--font-serif)" }}>
       {/* ===== Left: Thinking Stream ===== */}
       <div style={{ flex: "0 0 50%", borderRight: "1px solid #e5e7eb", background: "#fafbfc", height: "100vh", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "12px 20px", borderBottom: "1px solid #f0f0f0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.15em", color: "#94a3b8", fontWeight: 700 }}>
-            {"💭"} 思考过程
+        <div style={{ padding: "10px 24px", borderBottom: "1px solid #f0f0f0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44 }}>
+          <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", color: "#94a3b8", fontWeight: 600 }}>
+            思考过程
           </span>
           {status === "streaming" && (
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#14b8a6" }} />
+            <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#14b8a6" }} />
+          )}
+          {status === "done" && (
+            <span style={{ fontSize: 10, color: "#0d9488" }}>完成</span>
           )}
         </div>
         <ThinkingStream entries={thinking} />
