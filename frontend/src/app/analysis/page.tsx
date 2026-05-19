@@ -147,18 +147,15 @@ function AnalysisContent() {
     <main className="h-screen flex overflow-hidden" style={{ fontFamily: "var(--font-serif)" }}>
       {/* ===== Left: Thinking Stream ===== */}
       <div style={{ flex: "0 0 50%", borderRight: "1px solid #e5e7eb", background: "#fafbfc", height: "100vh", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "10px 24px", borderBottom: "1px solid #f0f0f0", background: "#fff", display: "flex", alignItems: "baseline", justifyContent: "space-between", minHeight: 44 }}>
+        <div style={{ padding: "10px 24px", borderBottom: "1px solid #f0f0f0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44 }}>
           <span style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 700, color: "#111" }}>
             Inv<span style={{ background: "linear-gradient(135deg, #0d9488, #14b8a6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>X</span>t
-            <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", color: "#94a3b8", fontWeight: 600, marginLeft: 10 }}>
-              思考过程
-            </span>
           </span>
-          <span style={{ fontFamily: "var(--font-serif)", fontSize: 11, color: status === "streaming" ? "#d97706" : status === "done" ? "#0d9488" : "#94a3b8" }}>
-            {status === "streaming" && "分析中"}
-            {status === "done" && "完成"}
-            {status === "error" && "中断"}
-          </span>
+          <span style={{
+            width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+            background: status === "error" ? "#dc2626" : status === "done" ? "#0d9488" : "#14b8a6",
+            animation: status === "streaming" ? "pulse 1.5s ease-in-out infinite" : "none",
+          }} />
         </div>
         <ThinkingStream entries={thinking} />
       </div>
