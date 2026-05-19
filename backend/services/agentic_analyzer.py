@@ -295,5 +295,4 @@ class AgenticAnalyzer:
                     yield {"type": "thinking", "text": full_content}
                 break
 
-        print(f"[AgenticAnalyzer] Analysis complete, yielding done", file=sys.stderr)
-        yield {"type": "done"}
+        print(f"[AgenticAnalyzer] Analysis complete", file=sys.stderr)
