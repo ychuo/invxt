@@ -1,7 +1,15 @@
 """Per-stock market signal fetcher for scoring context."""
 from __future__ import annotations
 import math
+import os
 import sys
+
+# 禁用代理，akshare 直连东方财富等数据源
+os.environ.pop("HTTP_PROXY", None)
+os.environ.pop("HTTPS_PROXY", None)
+os.environ.pop("http_proxy", None)
+os.environ.pop("https_proxy", None)
+os.environ["NO_PROXY"] = "*"
 
 
 async def get_signals_for_companies(

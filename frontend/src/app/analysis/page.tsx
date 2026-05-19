@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { getGraph } from "@/lib/api";
+import { getAnalysisByTopic, getGraph } from "@/lib/api";
 import type { GraphData, ScoredCompany, ThemeResult } from "@/types";
 import { useAnalysisStream } from "@/hooks/useAnalysisStream";
 import ThinkingStream from "@/components/ThinkingStream";
@@ -78,18 +78,29 @@ function AnalysisContent() {
   const topic = params.get("q") || "";
   const market = params.get("market") || "A";
 
-  const { thinking, blocks, status, error, start, cancel } = useAnalysisStream();
+  const { thinking, blocks, status, error, taskId, start, cancel, loadFromCache } = useAnalysisStream();
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [activeNav, setActiveNav] = useState("graph");
   const [flashBlock, setFlashBlock] = useState<string | null>(null);
   const [highlightedEntry, setHighlightedEntry] = useState<number | null>(null);
 
-  // Start analysis on mount
+  // On mount: check Redis cache first, otherwise start new stream
   useEffect(() => {
     if (!topic) return;
-    start(topic, market);
-    return () => cancel();
-  }, [topic, market, start, cancel]);
+    let ignore = false;
+    (async () => {
+      try {
+        const cached = await getAnalysisByTopic(topic, market);
+        if (ignore) return;
+        if (cached?.task_id && (cached.status === "completed" || cached.status === "running")) {
+          loadFromCache(cached.task_id);
+          return;
+        }
+      } catch {}
+      if (!ignore) start(topic, market);
+    })();
+    return () => { ignore = true; cancel(); };
+  }, [topic, market, start, cancel, loadFromCache]);
 
   // Fetch graph data when chain blocks arrive
   useEffect(() => {
