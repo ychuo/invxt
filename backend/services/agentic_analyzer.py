@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import sys
 from datetime import date
 from backend.services.llm_client import LLMClient
 from backend.services.search_client import SearchClient
@@ -17,7 +18,7 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "搜索关键词，越具体越好"},
-                    "max_results": {"type": "integer", "default": 8},
+                    "max_results": {"type": "integer", "default": 5},
                 },
                 "required": ["query"],
             },
@@ -146,7 +147,7 @@ class AgenticAnalyzer:
     async def _execute_tool(self, name: str, args: dict) -> str:
         if name == "web_search":
             results = await self._search.search(
-                args["query"], max_results=args.get("max_results", 8)
+                args["query"], max_results=args.get("max_results", 5)
             )
             return json.dumps(results, ensure_ascii=False)
         elif name == "get_fundamentals":
@@ -183,7 +184,12 @@ class AgenticAnalyzer:
 
         max_steps = 20
         for step in range(max_steps):
+            # Debug: log step and message sizes
+            total_chars = sum(len(str(m.get("content", ""))) + str(m.get("tool_calls", "")).__len__() for m in messages)
+            print(f"[AgenticAnalyzer] Step {step+1}/{max_steps}, {len(messages)} messages, ~{total_chars} chars, calling chat_stream...", file=sys.stderr)
+
             stream = await self._llm.chat_stream(messages=messages, tools=TOOLS)
+            print(f"[AgenticAnalyzer] Step {step+1}: stream created, starting iteration...", file=sys.stderr)
 
             full_content = ""
             full_reasoning = ""
@@ -231,6 +237,7 @@ class AgenticAnalyzer:
 
             # Process tool calls
             if tool_calls_buf:
+                print(f"[AgenticAnalyzer] Step {step+1}: got {len(tool_calls_buf)} tool calls: {[tc['function']['name'] for tc in tool_calls_buf]}", file=sys.stderr)
                 msg = {"role": "assistant", "content": full_content or None}
                 msg["tool_calls"] = [
                     {
@@ -274,8 +281,10 @@ class AgenticAnalyzer:
                     )
             else:
                 # No tool calls — model is done
+                print(f"[AgenticAnalyzer] Step {step+1}: no tool calls, done. full_content={len(full_content)} chars", file=sys.stderr)
                 if full_content:
                     yield {"type": "thinking", "text": full_content}
                 break
 
+        print(f"[AgenticAnalyzer] Analysis complete, yielding done", file=sys.stderr)
         yield {"type": "done"}
