@@ -133,18 +133,30 @@ async def analyze_stream(req: AnalyzeRequest):
 
         async def _run():
             nonlocal status, blocks, thinking_entries
-            thinking_buf = ""  # consolidate consecutive thinking events
+            thinking_buf = ""
+            last_flush = asyncio.get_event_loop().time()
             try:
                 async for event in analyzer.analyze(req.topic, req.market):
-                    await q.put(event)
                     etype = event.get("type", "")
                     if etype == "thinking":
                         thinking_buf += event.get("text", "")
+                        now = asyncio.get_event_loop().time()
+                        # Flush every 2s or every ~200 chars for smooth display
+                        if len(thinking_buf) >= 200 or now - last_flush >= 2.0:
+                            if thinking_buf.strip():
+                                flush_event = {"type": "thinking", "text": thinking_buf}
+                                await q.put(flush_event)
+                                thinking_entries.append(flush_event)
+                                thinking_buf = ""
+                                last_flush = now
                     else:
                         # Flush accumulated thinking before non-thinking event
                         if thinking_buf.strip():
-                            thinking_entries.append({"type": "thinking", "text": thinking_buf})
+                            flush_event = {"type": "thinking", "text": thinking_buf}
+                            await q.put(flush_event)
+                            thinking_entries.append(flush_event)
                             thinking_buf = ""
+                        await q.put(event)
                         # Skip internal tool_call/tool_result for emit_conclusion/emit_correction
                         if etype in ("tool_call", "tool_result") and event.get("name") in ("emit_conclusion", "emit_correction"):
                             continue
@@ -161,7 +173,9 @@ async def analyze_stream(req: AnalyzeRequest):
                             await _save_state(task_id, req.topic, req.market, blocks, thinking_entries, "running")
                 # Flush any remaining thinking
                 if thinking_buf.strip():
-                    thinking_entries.append({"type": "thinking", "text": thinking_buf})
+                    flush_event = {"type": "thinking", "text": thinking_buf}
+                    await q.put(flush_event)
+                    thinking_entries.append(flush_event)
             except Exception as e:
                 import sys, traceback
                 print(f"[SSE] analyzer error: {type(e).__name__}: {e}", file=sys.stderr)
