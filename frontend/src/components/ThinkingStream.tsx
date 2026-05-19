@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Search, PieChart, TrendingUp, Network } from "lucide-react";
 import type { ThinkingEntry } from "@/hooks/useAnalysisStream";
 
@@ -193,6 +194,7 @@ export default function ThinkingStream({ entries }: { entries: ThinkingEntry[] }
           return (
             <div key={item.key} style={{ marginBottom: 20, fontSize: 14, lineHeight: 1.9, color: "#334155" }}>
               <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
                 components={{
                   p: ({ children }) => <p style={{ margin: "0 0 8px" }}>{children}</p>,
                   strong: ({ children }) => <strong style={{ color: "#0f172a" }}>{children}</strong>,
@@ -203,6 +205,10 @@ export default function ThinkingStream({ entries }: { entries: ThinkingEntry[] }
                   code: ({ children }) => <code style={{ background: "#f1f5f9", padding: "1px 5px", borderRadius: 4, fontSize: 12, fontFamily: "var(--font-mono)" }}>{children}</code>,
                   h3: ({ children }) => <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: "12px 0 4px" }}>{children}</h3>,
                   blockquote: ({ children }) => <blockquote style={{ borderLeft: "2px solid #e5e7eb", paddingLeft: 12, margin: "8px 0", color: "#64748b" }}>{children}</blockquote>,
+                  table: ({ children }) => <table style={{ width: "100%", borderCollapse: "collapse", margin: "8px 0", fontSize: 12, border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>{children}</table>,
+                  thead: ({ children }) => <thead style={{ background: "#f8fafc" }}>{children}</thead>,
+                  th: ({ children }) => <th style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, color: "#64748b", fontSize: 11, borderBottom: "1px solid #e5e7eb" }}>{children}</th>,
+                  td: ({ children }) => <td style={{ padding: "6px 10px", borderBottom: "1px solid #f1f5f9", color: "#475569" }}>{children}</td>,
                 }}
               >
                 {item.text}
