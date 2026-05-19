@@ -105,8 +105,30 @@ async def analyze_stream(req: AnalyzeRequest):
     analyzer = AgenticAnalyzer()
 
     async def event_stream():
-        async for event in analyzer.analyze(req.topic, req.market):
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        q: asyncio.Queue = asyncio.Queue()
+
+        async def _run():
+            try:
+                async for event in analyzer.analyze(req.topic, req.market):
+                    await q.put(event)
+            except Exception:
+                pass
+            finally:
+                await q.put(None)  # sentinel
+
+        asyncio.create_task(_run())
+
+        while True:
+            try:
+                item = await asyncio.wait_for(q.get(), timeout=15.0)
+            except asyncio.TimeoutError:
+                # No event for 15s — heartbeat keeps connection alive
+                yield ": heartbeat\n\n"
+                continue
+
+            if item is None:
+                break
+            yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         event_stream(),
