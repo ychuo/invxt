@@ -2,6 +2,7 @@
 import { useState, useRef, useCallback } from "react";
 
 export type ThinkingEntry =
+  | { type: "meta"; task_id: string }
   | { type: "reasoning"; text: string }
   | { type: "tool_call"; name: string; args: Record<string, unknown> }
   | { type: "tool_result"; name: string; result: string }
@@ -14,6 +15,7 @@ interface AnalysisState {
   blocks: Record<string, unknown>;
   status: "idle" | "streaming" | "done" | "error";
   error: string | null;
+  taskId: string | null;
 }
 
 const API_BASE = "http://localhost:8000/api";
@@ -24,6 +26,7 @@ export function useAnalysisStream() {
     blocks: {},
     status: "idle",
     error: null,
+    taskId: null,
   });
   const abortRef = useRef<AbortController | null>(null);
 
@@ -31,7 +34,7 @@ export function useAnalysisStream() {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setState({ thinking: [], blocks: {}, status: "streaming", error: null });
+    setState({ thinking: [], blocks: {}, status: "streaming", error: null, taskId: null });
 
     try {
       const response = await fetch(`${API_BASE}/analyze/stream`, {
@@ -60,6 +63,9 @@ export function useAnalysisStream() {
             const entry: ThinkingEntry = JSON.parse(line.slice(6));
             setState((prev) => {
               const next = { ...prev, thinking: [...prev.thinking, entry] };
+              if (entry.type === "meta") {
+                next.taskId = entry.task_id;
+              }
               if (entry.type === "conclusion") {
                 try {
                   const content = JSON.parse(entry.content);
@@ -86,5 +92,29 @@ export function useAnalysisStream() {
     abortRef.current?.abort();
   }, []);
 
-  return { ...state, start, cancel };
+  const loadFromCache = useCallback(async (taskId: string) => {
+    setState((prev) => ({ ...prev, status: "streaming" }));
+    try {
+      const res = await fetch(`${API_BASE}/theme/${taskId}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.status === "completed") {
+        const blocks: Record<string, unknown> = {};
+        if (data.theme) blocks.theme = data.theme;
+        if (data.chain?.length) blocks.chain = data.chain;
+        if (data.companies?.length) blocks.companies = data.companies;
+        if (data.scored?.length) blocks.logic = data.scored;
+        setState((prev) => ({
+          ...prev,
+          blocks,
+          status: "done",
+          taskId: taskId,
+        }));
+      }
+    } catch (err) {
+      setState((prev) => ({ ...prev, status: "error", error: String(err) }));
+    }
+  }, []);
+
+  return { ...state, start, cancel, loadFromCache };
 }
