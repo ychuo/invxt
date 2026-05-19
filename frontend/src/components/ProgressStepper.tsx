@@ -1,7 +1,6 @@
 "use client";
 
 const STEPS = [
-  { key: "search", label: "搜索" },
   { key: "theme_understanding", label: "主题" },
   { key: "chain_reasoning", label: "产业链" },
   { key: "company_mapping", label: "公司" },
