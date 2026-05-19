@@ -1,6 +1,7 @@
 """Per-stock market signal fetcher for scoring context."""
 from __future__ import annotations
 import math
+import sys
 
 
 async def get_signals_for_companies(
@@ -56,8 +57,8 @@ async def _fetch_a_share(
             net = _parse_net_amount(row.get("净额"))
             if net is not None:
                 fund_flow_map[code] = net
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[market_signal] fund_flow fetch failed: {type(e).__name__}: {e}", file=sys.stderr)
 
     for ticker in tickers:
         # Strip exchange suffix for matching: "600584.SH" → "600584"
@@ -71,6 +72,7 @@ async def _fetch_a_share(
                 adjust="qfq",
             )
             if df is None or len(df) < 22:
+                print(f"[market_signal] A-share {ticker}: insufficient data (rows={len(df) if df is not None else 0})", file=sys.stderr)
                 continue
             close = df["收盘"].astype(float)
             volume = df["成交量"].astype(float)
@@ -110,7 +112,8 @@ async def _fetch_a_share(
                 "rsi_14": rsi,
                 "fund_flow": fund_flow,
             }
-        except Exception:
+        except Exception as e:
+            print(f"[market_signal] fetch A-share {ticker} failed: {type(e).__name__}: {e}", file=sys.stderr)
             continue
 
     return results
@@ -127,6 +130,7 @@ async def _fetch_us(
             stock = yf.Ticker(ticker)
             df = stock.history(period="1y")
             if df is None or len(df) < 22:
+                print(f"[market_signal] US {ticker}: insufficient data (rows={len(df) if df is not None else 0})", file=sys.stderr)
                 continue
             close = df["Close"].astype(float)
             volume = df["Volume"].astype(float)
@@ -146,7 +150,8 @@ async def _fetch_us(
                 "rsi_14": rsi,
                 "fund_flow": None,  # yfinance no real-time fund flow
             }
-        except Exception:
+        except Exception as e:
+            print(f"[market_signal] fetch US {ticker} failed: {type(e).__name__}: {e}", file=sys.stderr)
             continue
 
     return results
