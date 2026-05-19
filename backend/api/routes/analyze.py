@@ -101,8 +101,8 @@ async def create_analysis(req: AnalyzeRequest):
 
 
 @router.post("/analyze/stream")
-async def analyze_stream(req: AnalyzeRequest, mock: bool = False):
-    analyzer = AgenticAnalyzer(mock_search=mock)
+async def analyze_stream(req: AnalyzeRequest):
+    analyzer = AgenticAnalyzer()
 
     async def event_stream():
         q: asyncio.Queue = asyncio.Queue()

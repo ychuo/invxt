@@ -138,20 +138,14 @@ emit_conclusion 的 content 格式要求：
 
 
 class AgenticAnalyzer:
-    def __init__(self, mock_search: bool = False):
+    def __init__(self):
         self._llm = LLMClient()
-        self._search = SearchClient() if not mock_search else None
+        self._search = SearchClient()
         self._neo4j = Neo4jClient()
         self._vector = VectorStore()
-        self._mock_search = mock_search
 
     async def _execute_tool(self, name: str, args: dict) -> str:
         if name == "web_search":
-            if self._mock_search:
-                return json.dumps([
-                    {"title": "Mock: " + args.get("query", ""), "url": "https://example.com",
-                     "content": "这是模拟搜索结果。HBM产业链包括上游设备和材料、中游先进封装、下游AI服务器。"},
-                ], ensure_ascii=False)
             results = await self._search.search(
                 args["query"], max_results=args.get("max_results", 5)
             )
