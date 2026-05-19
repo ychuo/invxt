@@ -8,7 +8,8 @@ export type ThinkingEntry =
   | { type: "tool_result"; name: string; result: string }
   | { type: "conclusion"; block: string; content: string }
   | { type: "correction"; block: string; reason: string }
-  | { type: "done" };
+  | { type: "done" }
+  | { type: "error"; message: string };
 
 interface AnalysisState {
   thinking: ThinkingEntry[];

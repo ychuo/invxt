@@ -145,6 +145,9 @@ async def analyze_stream(req: AnalyzeRequest):
                         if thinking_buf.strip():
                             thinking_entries.append({"type": "thinking", "text": thinking_buf})
                             thinking_buf = ""
+                        # Skip internal tool_call/tool_result for emit_conclusion/emit_correction
+                        if etype in ("tool_call", "tool_result") and event.get("name") in ("emit_conclusion", "emit_correction"):
+                            continue
                         thinking_entries.append(event)
                         if etype == "conclusion":
                             block = event.get("block", "")

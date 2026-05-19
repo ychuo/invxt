@@ -80,8 +80,8 @@ export default function ThinkingStream({
           );
         }
 
-        // --- Tool call ---
-        if (entry.type === "tool_call") {
+        // --- Tool call (skip internal tools) ---
+        if (entry.type === "tool_call" && entry.name !== "emit_conclusion" && entry.name !== "emit_correction") {
           return (
             <div key={i} style={{
               background: "#fff",
@@ -108,8 +108,8 @@ export default function ThinkingStream({
           );
         }
 
-        // --- Tool result ---
-        if (entry.type === "tool_result") {
+        // --- Tool result (skip internal tools) ---
+        if (entry.type === "tool_result" && entry.name !== "emit_conclusion" && entry.name !== "emit_correction") {
           return (
             <div key={i} style={{
               background: "#fafbfc",
@@ -175,6 +175,23 @@ export default function ThinkingStream({
               <div style={{ fontSize: 12, color: "#92400e", lineHeight: 1.6 }}>
                 {entry.reason}
               </div>
+            </div>
+          );
+        }
+
+        // --- Error ---
+        if (entry.type === "error") {
+          return (
+            <div key={i} style={{
+              background: "#fef2f2",
+              borderLeft: "3px solid #dc2626",
+              padding: "10px 14px",
+              borderRadius: "0 8px 8px 0",
+              marginBottom: 12,
+              fontSize: 12,
+              color: "#b91c1c",
+            }}>
+              {entry.message}
             </div>
           );
         }
