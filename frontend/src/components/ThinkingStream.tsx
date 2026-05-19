@@ -63,20 +63,7 @@ function pairEntries(entries: ThinkingEntry[]): RenderItem[] {
   return items;
 }
 
-// ── Shared styles matching the report design system ──
-
-const badgeGreen: React.CSSProperties = {
-  background: "#dcfce7", color: "#166534",
-  fontSize: 10, padding: "2px 8px", borderRadius: 100, fontWeight: 600,
-};
-const badgeAmber: React.CSSProperties = {
-  background: "#fef3c7", color: "#92400e",
-  fontSize: 10, padding: "2px 8px", borderRadius: 100, fontWeight: 600,
-};
-const blockLabel: React.CSSProperties = {
-  fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em",
-  color: "#94a3b8", fontWeight: 600,
-};
+// ── Shared styles ──
 
 // ── Sub-components ──
 
@@ -98,17 +85,16 @@ function SearchResults({ raw }: { raw: string }) {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {results.map((r, j) => (
         <a key={j} href={r.url} target="_blank" rel="noopener noreferrer"
-           style={{ display: "block", border: "1px solid #f0f0f0", borderRadius: 8,
-                    padding: "10px 12px", textDecoration: "none", cursor: "pointer" }}>
+           style={{ display: "block", textDecoration: "none", cursor: "pointer" }}>
           <div style={{ fontFamily: "var(--font-serif)", fontSize: 12, fontWeight: 600,
-                        color: "#0f766e", marginBottom: 3, lineHeight: 1.4 }}>
+                        color: "#0f766e", marginBottom: 2, lineHeight: 1.5 }}>
             {r.title}
           </div>
-          <div style={{ fontSize: 11, color: "#94a3b8", lineHeight: 1.5 }}>{r.snippet}</div>
-          <div style={{ fontSize: 9, color: "#cbd5e1", marginTop: 4, fontFamily: "monospace" }}>
+          <div style={{ fontSize: 11, color: "#94a3b8", lineHeight: 1.6, marginBottom: 2 }}>{r.snippet}</div>
+          <div style={{ fontSize: 9, color: "#cbd5e1", fontFamily: "monospace" }}>
             {(() => { try { return new URL(r.url).hostname; } catch { return r.url; } })()}
           </div>
         </a>
@@ -136,14 +122,7 @@ function OtherResult({ raw }: { raw: string }) {
 }
 
 function ToolResultBody({ name, result }: { name: string; result?: string }) {
-  if (!result) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 0" }}>
-        <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#0d9488", animation: "pulse 1.2s ease-in-out infinite" }} />
-        <span style={{ fontSize: 11, color: "#94a3b8", fontStyle: "italic" }}>执行中...</span>
-      </div>
-    );
-  }
+  if (!result) return null;
 
   if (name === "web_search") {
     return <SearchResults raw={result} />;
@@ -235,17 +214,25 @@ export default function ThinkingStream({ entries }: { entries: ThinkingEntry[] }
           const done = !!item.result;
 
           return (
-            <div key={item.key} style={{ marginBottom: 20 }}>
-              {/* Header — same pattern as report BlockHeader */}
+            <div key={item.key} style={{ margin: "24px 0" }}>
               <div style={{
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "12px 0", borderBottom: "1px solid #f0f0f0", marginBottom: 12,
+                display: "flex", alignItems: "center", gap: 7,
+                marginBottom: 10,
               }}>
                 <Icon size={13} color="#94a3b8" strokeWidth={1.5} />
-                <span style={blockLabel}>{title}</span>
-                <span style={done ? badgeGreen : badgeAmber}>
-                  {done ? "完成" : "执行中"}
+                <span style={{
+                  fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em",
+                  color: "#94a3b8", fontWeight: 600,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
+                }}>
+                  {title}
                 </span>
+                {!done && (
+                  <span style={{
+                    width: 5, height: 5, borderRadius: "50%", background: "#d97706",
+                    flexShrink: 0, animation: "pulse 1.2s ease-in-out infinite",
+                  }} />
+                )}
               </div>
               <ToolResultBody name={item.name} result={item.result} />
             </div>
