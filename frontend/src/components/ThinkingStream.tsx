@@ -1,12 +1,14 @@
 "use client";
 import { useMemo, useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import { Search, PieChart, TrendingUp, Network } from "lucide-react";
 import type { ThinkingEntry } from "@/hooks/useAnalysisStream";
 
-const TOOL_LABELS: Record<string, string> = {
-  web_search: "搜索",
-  get_fundamentals: "获取基本面",
-  get_market_signals: "获取行情信号",
-  query_knowledge_graph: "查询知识图谱",
+const TOOL_META: Record<string, { icon: typeof Search; label: string }> = {
+  web_search: { icon: Search, label: "搜索" },
+  get_fundamentals: { icon: PieChart, label: "获取基本面" },
+  get_market_signals: { icon: TrendingUp, label: "获取行情信号" },
+  query_knowledge_graph: { icon: Network, label: "查询知识图谱" },
 };
 
 const BLOCK_CONCLUSION_LABELS: Record<string, string> = {
@@ -185,39 +187,53 @@ export default function ThinkingStream({ entries }: { entries: ThinkingEntry[] }
       )}
 
       {items.map((item, i) => {
-        // ── Thinking ──
+        // ── Thinking (markdown) ──
         if (item.type === "thinking") {
           const isLast = i === lastThinkingIdx && isStreaming;
           return (
-            <div key={item.key} style={{ marginBottom: 20 }}>
-              <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+            <div key={item.key} style={{ marginBottom: 20, fontSize: 14, lineHeight: 1.9, color: "#334155" }}>
+              <ReactMarkdown
+                components={{
+                  p: ({ children }) => <p style={{ margin: "0 0 8px" }}>{children}</p>,
+                  strong: ({ children }) => <strong style={{ color: "#0f172a" }}>{children}</strong>,
+                  ul: ({ children }) => <ul style={{ margin: "4px 0", paddingLeft: 18 }}>{children}</ul>,
+                  ol: ({ children }) => <ol style={{ margin: "4px 0", paddingLeft: 18 }}>{children}</ol>,
+                  li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
+                  em: ({ children }) => <em style={{ color: "#64748b" }}>{children}</em>,
+                  code: ({ children }) => <code style={{ background: "#f1f5f9", padding: "1px 5px", borderRadius: 4, fontSize: 12, fontFamily: "var(--font-mono)" }}>{children}</code>,
+                  h3: ({ children }) => <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: "12px 0 4px" }}>{children}</h3>,
+                  blockquote: ({ children }) => <blockquote style={{ borderLeft: "2px solid #e5e7eb", paddingLeft: 12, margin: "8px 0", color: "#64748b" }}>{children}</blockquote>,
+                }}
+              >
                 {item.text}
-                {isLast && (
-                  <span style={{
-                    display: "inline-block", width: 2, height: 14,
-                    background: "#0d9488", marginLeft: 2,
-                    verticalAlign: "text-bottom",
-                    animation: "blink 0.8s step-end infinite",
-                  }} />
-                )}
-              </p>
+              </ReactMarkdown>
+              {isLast && (
+                <span style={{
+                  display: "inline-block", width: 2, height: 14,
+                  background: "#0d9488", marginLeft: 2,
+                  verticalAlign: "text-bottom",
+                  animation: "blink 0.8s step-end infinite",
+                }} />
+              )}
             </div>
           );
         }
 
         // ── Tool call ──
         if (item.type === "tool") {
-          const label = TOOL_LABELS[item.name] || item.name;
-          const title = item.query ? `${label}: ${item.query}` : label;
+          const meta = TOOL_META[item.name] || { icon: Search, label: item.name };
+          const Icon = meta.icon;
+          const title = item.query ? `${meta.label}: ${item.query}` : meta.label;
           const done = !!item.result;
 
           return (
             <div key={item.key} style={{ marginBottom: 20 }}>
               {/* Header — same pattern as report BlockHeader */}
               <div style={{
-                display: "flex", alignItems: "center", gap: 10,
+                display: "flex", alignItems: "center", gap: 8,
                 padding: "12px 0", borderBottom: "1px solid #f0f0f0", marginBottom: 12,
               }}>
+                <Icon size={13} color="#94a3b8" strokeWidth={1.5} />
                 <span style={blockLabel}>{title}</span>
                 <span style={done ? badgeGreen : badgeAmber}>
                   {done ? "完成" : "执行中"}
