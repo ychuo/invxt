@@ -167,7 +167,7 @@ function AnalysisContent() {
         {/* ===== Sticky Nav ===== */}
         <div className="sticky top-0 z-10 bg-white border-b border-[#f0f0f0]" style={{ height: 44, display: "flex", alignItems: "center" }}>
           <div className="max-w-4xl mx-auto flex items-center gap-0 px-6 w-full">
-            <div className="flex gap-3 overflow-x-auto">
+            <div className="flex gap-5 overflow-x-auto">
               {NAV_ITEMS.map((item) => (
                 <button
                   key={item.key}
