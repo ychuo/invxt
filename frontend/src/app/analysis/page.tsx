@@ -147,16 +147,16 @@ function AnalysisContent() {
     <main className="h-screen flex overflow-hidden" style={{ fontFamily: "var(--font-serif)" }}>
       {/* ===== Left: Thinking Stream ===== */}
       <div style={{ flex: "0 0 50%", borderRight: "1px solid #e5e7eb", background: "#fafbfc", height: "100vh", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "10px 24px", borderBottom: "1px solid #f0f0f0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44 }}>
-          <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", color: "#94a3b8", fontWeight: 600 }}>
+        <div style={{ padding: "10px 24px", borderBottom: "1px solid #f0f0f0", background: "#fff", display: "flex", alignItems: "baseline", justifyContent: "space-between", minHeight: 44 }}>
+          <span style={{ fontFamily: "var(--font-serif)", fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
             思考过程
           </span>
-          {status === "streaming" && (
-            <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#14b8a6" }} />
-          )}
-          {status === "done" && (
-            <span style={{ fontSize: 10, color: "#0d9488" }}>完成</span>
-          )}
+          <span style={{ fontFamily: "var(--font-serif)", fontSize: 11, color: status === "streaming" ? "#d97706" : status === "done" ? "#0d9488" : "#94a3b8" }}>
+            {status === "streaming" && "分析中"}
+            {status === "done" && "完成"}
+            {status === "error" && "中断"}
+            {status === "idle" && "等待中"}
+          </span>
         </div>
         <ThinkingStream entries={thinking} />
       </div>
