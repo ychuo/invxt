@@ -76,7 +76,8 @@ export function useAnalysisStream() {
       }
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
-        setState((prev) => ({ ...prev, status: "error", error: String(err) }));
+        const msg = err instanceof TypeError ? `网络连接中断: ${(err as Error).message}` : String(err);
+        setState((prev) => ({ ...prev, status: "error", error: msg }));
       }
     }
   }, []);

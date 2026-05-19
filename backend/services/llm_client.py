@@ -3,11 +3,14 @@ from openai import AsyncOpenAI
 from backend.config import settings
 
 
+import httpx
+
 class LLMClient:
     def __init__(self):
         self._client = AsyncOpenAI(
             api_key=settings.llm_api_key,
             base_url=settings.llm_base_url,
+            http_client=httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=10.0)),
         )
         self._model = settings.llm_model
 
