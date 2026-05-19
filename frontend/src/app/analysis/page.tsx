@@ -146,9 +146,9 @@ function AnalysisContent() {
   return (
     <main className="h-screen flex overflow-hidden" style={{ fontFamily: "var(--font-serif)" }}>
       {/* ===== Left: Thinking Stream ===== */}
-      <div style={{ flex: "0 0 50%", borderRight: "1px solid #e5e7eb", background: "#fafbfc", height: "100vh", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "10px 24px", borderBottom: "1px solid #f0f0f0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44 }}>
-          <span style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 700, color: "#111" }}>
+      <div style={{ flex: 1, borderRight: "1px solid #e5e7eb", background: "#fafbfc", height: "100vh", display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <div style={{ padding: "0 24px", borderBottom: "1px solid #f0f0f0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", height: 44 }}>
+          <span style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 700, color: "#111", lineHeight: "44px" }}>
             Inv<span style={{ background: "linear-gradient(135deg, #0d9488, #14b8a6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>X</span>t
           </span>
           <span style={{
@@ -161,16 +161,16 @@ function AnalysisContent() {
       </div>
 
       {/* ===== Right: Analysis Report ===== */}
-      <div style={{ flex: 1, overflowY: "auto", background: "#fff", height: "100vh" }}>
+      <div style={{ flex: "0 0 52%", overflowY: "auto", background: "#fff", height: "100vh", minWidth: 480 }}>
         {/* ===== Sticky Nav ===== */}
-        <div className="sticky top-0 z-10 bg-white border-b border-[#f0f0f0]">
-          <div className="max-w-4xl mx-auto flex items-center gap-0 px-6">
-            <div className="flex gap-0 overflow-x-auto flex-1">
+        <div className="sticky top-0 z-10 bg-white border-b border-[#f0f0f0]" style={{ height: 44, display: "flex", alignItems: "center" }}>
+          <div className="max-w-4xl mx-auto flex items-center gap-0 px-6 w-full">
+            <div className="flex gap-0 overflow-x-auto">
               {NAV_ITEMS.map((item) => (
                 <button
                   key={item.key}
                   onClick={() => scrollTo(item.key)}
-                  className={`px-3 py-2.5 text-[11px] whitespace-nowrap border-b-2 transition-colors ${
+                  className={`px-3 text-[11px] whitespace-nowrap border-b-2 transition-colors h-[44px] ${
                     activeNav === item.key
                       ? "text-[#0d9488] font-bold border-[#0d9488]"
                       : "text-[#94a3b8] border-transparent hover:text-[#64748b]"
