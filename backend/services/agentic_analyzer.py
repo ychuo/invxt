@@ -335,24 +335,38 @@ class AgenticAnalyzer:
 
     async def _execute_tool(self, name: str, args: dict) -> str:
         if name == "web_search":
+            query = args.get("query", "") or ""
+            if not query:
+                return json.dumps([], ensure_ascii=False)
             results = await self._search.search(
-                args["query"], max_results=args.get("max_results", 5)
+                query, max_results=args.get("max_results", 5)
             )
             return json.dumps(results, ensure_ascii=False)
         elif name == "get_fundamentals":
             from backend.services.fundamental_service import get_revenue_composition
 
-            comp = await get_revenue_composition(args["ticker"], args["market"])
+            ticker = args.get("ticker", "")
+            market = args.get("market", "A")
+            if not ticker:
+                return json.dumps({"error": "ticker is required"}, ensure_ascii=False)
+            comp = await get_revenue_composition(ticker, market)
             return json.dumps(comp, ensure_ascii=False) if comp else "无数据"
         elif name == "get_market_signals":
             from backend.services.market_signal import get_signals_for_companies
 
+            ticker = args.get("ticker", "")
+            market = args.get("market", "A")
+            if not ticker:
+                return json.dumps({"error": "ticker is required"}, ensure_ascii=False)
             signals = await get_signals_for_companies(
-                [{"ticker": args["ticker"], "market": args["market"]}]
+                [{"ticker": ticker, "market": market}]
             )
             return json.dumps(signals, ensure_ascii=False)
         elif name == "query_knowledge_graph":
-            result = self._neo4j.find_entity(args["entity_name"])
+            entity = args.get("entity_name", "")
+            if not entity:
+                return json.dumps({"error": "entity_name is required"}, ensure_ascii=False)
+            result = self._neo4j.find_entity(entity)
             return json.dumps(result, ensure_ascii=False) if result else "未找到"
         elif name in ("emit_theme", "emit_chain", "emit_companies", "emit_logic", "emit_correction"):
             return "ok"
@@ -453,7 +467,10 @@ class AgenticAnalyzer:
                     args = json.loads(raw_args) if raw_args.strip() else {}
                     yield {"type": "tool_call", "name": name, "args": args}
 
-                    result = await self._execute_tool(name, args)
+                    try:
+                        result = await self._execute_tool(name, args)
+                    except Exception as e:
+                        result = json.dumps({"error": f"{type(e).__name__}: {e}"}, ensure_ascii=False)
                     yield {"type": "tool_result", "name": name, "result": result}
 
                     # Special handling for emit_* tools — yield as conclusion/correction events
