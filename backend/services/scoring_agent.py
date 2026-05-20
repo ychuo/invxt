@@ -22,17 +22,31 @@ AWARENESS_DISCOUNT = {
 
 
 def _compute_scores(companies: list[dict]) -> list[dict]:
-    """Algorithm computes scores from LLM-extracted tiers."""
+    """Algorithm computes scores from LLM-extracted tiers and moat assessment."""
     for c in companies:
         revenue = REVENUE_MAP.get(c.get("revenue_tier", "concept"), 10)
         discount = AWARENESS_DISCOUNT.get(c.get("market_awareness", "priced_in"), 0.5)
 
-        c["exposure_score"] = round(revenue * discount)
+        # Moat multiplier: average of 4 dimensions, 50 as neutral baseline
+        moat = c.get("moat_assessment")
+        if moat and isinstance(moat, dict):
+            moat_scores = [
+                moat.get("intangible_assets", 50),
+                moat.get("switching_costs", 50),
+                moat.get("network_effects", 50),
+                moat.get("cost_advantage", 50),
+            ]
+            moat_avg = sum(moat_scores) / 4
+        else:
+            moat_avg = 50
+        moat_multiplier = moat_avg / 50.0
+
+        c["exposure_score"] = min(100, round(revenue * discount * moat_multiplier))
         c["dimensions"] = {
             "industry_purity": revenue,
             "earnings_elasticity": revenue,
             "expectation_gap": round(discount * 100),
-            "competitive_moat": 50,
+            "competitive_moat": round(moat_avg),
             "market_awareness": round(discount * 100),
         }
 
