@@ -278,7 +278,7 @@ function AnalysisContent() {
                   : (blocks.companies as any[]).map(c => ({
                       company_name: c.company_name,
                       ticker: c.ticker,
-                      market: c.market as "A" | "US",
+                      market: (c.market === "a" || c.market === "A" || String(c.market).toUpperCase() === "A") ? "A" as const : "US" as const,
                       exposure_score: 0,
                       revenue_tier: "concept" as const,
                       market_awareness: "priced_in" as const,

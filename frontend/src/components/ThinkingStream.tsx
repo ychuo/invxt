@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Search, PieChart, TrendingUp, Network } from "lucide-react";
 import type { ThinkingEntry } from "@/hooks/useAnalysisStream";
+import { useTypewriter } from "@/hooks/useTypewriter";
 
 const TOOL_META: Record<string, { icon: typeof Search; label: string }> = {
   web_search: { icon: Search, label: "搜索" },
@@ -137,6 +138,47 @@ function ToolResultBody({ name, result }: { name: string; result?: string }) {
   return <OtherResult raw={result} />;
 }
 
+// ── Thinking block with optional typewriter ──
+
+function ThinkingBlock({ text, isStreaming }: { text: string; isStreaming: boolean }) {
+  const displayed = useTypewriter(text, isStreaming, 25);
+
+  return (
+    <div style={{ marginBottom: 20, paddingLeft: 14, borderLeft: "2px solid #e5e7eb" }}>
+      <div style={{ fontSize: 14, lineHeight: 1.9, color: "#334155" }}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            p: ({ children }) => <p style={{ margin: "0 0 8px" }}>{children}</p>,
+            strong: ({ children }) => <strong style={{ color: "#0f172a" }}>{children}</strong>,
+            ul: ({ children }) => <ul style={{ margin: "4px 0", paddingLeft: 18, listStyle: "disc" }}>{children}</ul>,
+            ol: ({ children }) => <ol style={{ margin: "4px 0", paddingLeft: 18, listStyle: "decimal" }}>{children}</ol>,
+            li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
+            em: ({ children }) => <em style={{ color: "#64748b" }}>{children}</em>,
+            code: ({ children }) => <code style={{ background: "#f1f5f9", padding: "1px 5px", borderRadius: 4, fontSize: 12, fontFamily: "var(--font-mono)" }}>{children}</code>,
+            h3: ({ children }) => <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: "12px 0 4px" }}>{children}</h3>,
+            blockquote: ({ children }) => <blockquote style={{ borderLeft: "2px solid #e5e7eb", paddingLeft: 12, margin: "8px 0", color: "#64748b" }}>{children}</blockquote>,
+            table: ({ children }) => <table style={{ width: "100%", borderCollapse: "collapse", margin: "8px 0", fontSize: 12, border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>{children}</table>,
+            thead: ({ children }) => <thead style={{ background: "#f8fafc" }}>{children}</thead>,
+            th: ({ children }) => <th style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, color: "#64748b", fontSize: 11, borderBottom: "1px solid #e5e7eb" }}>{children}</th>,
+            td: ({ children }) => <td style={{ padding: "6px 10px", borderBottom: "1px solid #f1f5f9", color: "#475569" }}>{children}</td>,
+          }}
+        >
+          {displayed}
+        </ReactMarkdown>
+        {isStreaming && (
+          <span style={{
+            display: "inline-block", width: 2, height: 14,
+            background: "#0d9488", marginLeft: 2,
+            verticalAlign: "text-bottom",
+            animation: "blink 0.8s step-end infinite",
+          }} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ──
 
 export default function ThinkingStream({ entries }: { entries: ThinkingEntry[] }) {
@@ -173,43 +215,10 @@ export default function ThinkingStream({ entries }: { entries: ThinkingEntry[] }
       )}
 
       {items.map((item, i) => {
-        // ── Thinking (markdown) ──
+        // ── Thinking (markdown, typewriter on last block) ──
         if (item.type === "thinking") {
           const isLast = i === lastThinkingIdx && isStreaming;
-          return (
-            <div key={item.key} style={{ marginBottom: 20, paddingLeft: 14, borderLeft: "2px solid #e5e7eb" }}>
-              <div style={{ fontSize: 14, lineHeight: 1.9, color: "#334155" }}>
-                <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  p: ({ children }) => <p style={{ margin: "0 0 8px" }}>{children}</p>,
-                  strong: ({ children }) => <strong style={{ color: "#0f172a" }}>{children}</strong>,
-                  ul: ({ children }) => <ul style={{ margin: "4px 0", paddingLeft: 18, listStyle: "disc" }}>{children}</ul>,
-                  ol: ({ children }) => <ol style={{ margin: "4px 0", paddingLeft: 18, listStyle: "decimal" }}>{children}</ol>,
-                  li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
-                  em: ({ children }) => <em style={{ color: "#64748b" }}>{children}</em>,
-                  code: ({ children }) => <code style={{ background: "#f1f5f9", padding: "1px 5px", borderRadius: 4, fontSize: 12, fontFamily: "var(--font-mono)" }}>{children}</code>,
-                  h3: ({ children }) => <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: "12px 0 4px" }}>{children}</h3>,
-                  blockquote: ({ children }) => <blockquote style={{ borderLeft: "2px solid #e5e7eb", paddingLeft: 12, margin: "8px 0", color: "#64748b" }}>{children}</blockquote>,
-                  table: ({ children }) => <table style={{ width: "100%", borderCollapse: "collapse", margin: "8px 0", fontSize: 12, border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>{children}</table>,
-                  thead: ({ children }) => <thead style={{ background: "#f8fafc" }}>{children}</thead>,
-                  th: ({ children }) => <th style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, color: "#64748b", fontSize: 11, borderBottom: "1px solid #e5e7eb" }}>{children}</th>,
-                  td: ({ children }) => <td style={{ padding: "6px 10px", borderBottom: "1px solid #f1f5f9", color: "#475569" }}>{children}</td>,
-                }}
-              >
-                {item.text}
-              </ReactMarkdown>
-                {isLast && (
-                  <span style={{
-                    display: "inline-block", width: 2, height: 14,
-                    background: "#0d9488", marginLeft: 2,
-                    verticalAlign: "text-bottom",
-                    animation: "blink 0.8s step-end infinite",
-                  }} />
-                )}
-              </div>
-            </div>
-          );
+          return <ThinkingBlock key={item.key} text={item.text} isStreaming={isLast} />;
         }
 
         // ── Tool call ──

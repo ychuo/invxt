@@ -79,9 +79,9 @@ export default function CompanyTable({ companies }: Props) {
               </td>
               <td className="p-3 whitespace-nowrap">
                 <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
-                  c.market === "A" ? "bg-[#fef2f2] text-[#dc2626]" : "bg-[#eff6ff] text-[#2563eb]"
+                  String(c.market).toUpperCase() === "A" ? "bg-[#fef2f2] text-[#dc2626]" : "bg-[#eff6ff] text-[#2563eb]"
                 }`}>
-                  {c.market === "A" ? "A股" : "美股"}
+                  {String(c.market).toUpperCase() === "A" ? "A股" : "美股"}
                 </span>
               </td>
               <td className="p-3 whitespace-nowrap">
