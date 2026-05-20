@@ -46,14 +46,15 @@ function pairEntries(entries: ThinkingEntry[]): RenderItem[] {
       items.push({ type: "tool", name: e.name, result: e.result, key: `t-${i}` });
       i++;
     } else if (e.type === "thinking") {
-      // Merge consecutive thinking entries into one flowing paragraph
+      // Merge consecutive thinking entries, stable key from segment start
+      const startIdx = i;
       let merged = e.text;
       i++;
       while (i < entries.length && entries[i].type === "thinking") {
         merged += (entries[i] as { type: "thinking"; text: string }).text;
         i++;
       }
-      items.push({ type: "thinking", text: merged, key: `th-${i}` });
+      items.push({ type: "thinking", text: merged, key: `th-${startIdx}` });
     } else if (e.type === "conclusion") {
       items.push({ type: "conclusion", block: e.block, key: `c-${i}` });
       i++;
