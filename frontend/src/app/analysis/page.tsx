@@ -165,11 +165,20 @@ function AnalysisContent() {
                 onClick={handleRestart}
                 style={{
                   fontFamily: "var(--font-serif)",
-                  fontSize: 11, color: "#94a3b8", background: "none", border: "none",
-                  cursor: "pointer", padding: "4px 0",
+                  fontSize: 11, color: "#94a3b8",
+                  background: "none", border: "1px solid #e5e7eb",
+                  borderRadius: 6, cursor: "pointer",
+                  padding: "3px 10px",
+                  transition: "border-color 0.15s, color 0.15s",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "#0d9488")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = "#0d9488";
+                  e.currentTarget.style.borderColor = "#0d9488";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = "#94a3b8";
+                  e.currentTarget.style.borderColor = "#e5e7eb";
+                }}
               >
                 重新调研
               </button>
