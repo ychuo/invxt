@@ -1,8 +1,34 @@
+export interface MoatAssessment {
+  intangible_assets: number;
+  switching_costs: number;
+  network_effects: number;
+  cost_advantage: number;
+}
+
+export interface Catalyst {
+  event: string;
+  timeframe: string;
+  impact: "高" | "中" | "低";
+}
+
+export interface ExecutiveSummary {
+  theme_definition: string;
+  lifecycle_and_market: string;
+  core_links: string;
+  top_picks: { company_name: string; ticker: string; rating: string; logic: string }[];
+  biggest_mispricing: string;
+  key_catalysts: string;
+}
+
 export interface ThemeResult {
   theme_name: string;
   category: string;
   summary: string;
   directions: Direction[];
+  lifecycle_stage?: string;
+  tam_description?: string;
+  policy_analysis?: string;
+  executive_summary?: ExecutiveSummary;
 }
 
 export interface Direction {
@@ -18,6 +44,9 @@ export interface ChainResult {
   downstream: string[];
   key_materials: string[];
   key_equipment: string[];
+  profit_pool?: string;
+  concentration?: string;
+  localization_rate?: string;
 }
 
 export interface CompanyMapping {
@@ -26,6 +55,9 @@ export interface CompanyMapping {
   market: "A" | "US";
   reasoning: string;
   relevance: string;
+  selected_for_deep_research?: boolean;
+  selection_reason?: string;
+  industry_position?: string;
 }
 
 export interface KeyVariable {
@@ -36,6 +68,7 @@ export interface KeyVariable {
 export interface RiskItem {
   risk: string;
   detail: string;
+  falsifiable_condition?: string;
 }
 
 export interface ScoredCompany {
@@ -53,6 +86,9 @@ export interface ScoredCompany {
     market_awareness: number;
   };
   investment_logic: string;
+  investment_rating?: string;
+  moat_assessment?: MoatAssessment;
+  catalysts?: Catalyst[];
   key_variables: KeyVariable[];
   risks: RiskItem[];
 }
