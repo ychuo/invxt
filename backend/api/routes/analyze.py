@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from backend.config import settings
 from backend.services.pipeline import AnalysisPipeline, StepStatus
 from backend.services.agentic_analyzer import AgenticAnalyzer
+from backend.services.scoring_agent import _compute_scores
 
 router = APIRouter()
 
@@ -156,6 +157,15 @@ async def analyze_stream(req: AnalyzeRequest):
                             await q.put(flush_event)
                             thinking_entries.append(flush_event)
                             thinking_buf = ""
+                        # Score logic content before sending to frontend
+                        if etype == "conclusion" and event.get("block") == "logic":
+                            try:
+                                raw = json.loads(event.get("content", "")) if isinstance(event.get("content"), str) else event.get("content")
+                                if isinstance(raw, list):
+                                    event = {**event, "content": json.dumps(_compute_scores(raw), ensure_ascii=False)}
+                            except Exception:
+                                pass
+
                         await q.put(event)
                         # Skip internal tool_call/tool_result for emit_conclusion/emit_correction
                         if etype in ("tool_call", "tool_result") and event.get("name") in ("emit_conclusion", "emit_correction"):
