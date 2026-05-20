@@ -47,6 +47,19 @@ export default function LogicCards({ companies }: Props) {
               )}
             </div>
             <ScoreBar score={c.exposure_score} />
+            {c.investment_rating && (
+              <span style={{
+                fontSize: 10, padding: "2px 6px", borderRadius: 4, fontWeight: 600,
+                background: c.investment_rating === "强烈推荐" ? "#fef2f2" :
+                            c.investment_rating === "推荐" ? "#f0fdfa" :
+                            c.investment_rating === "关注" ? "#fef3c7" : "#f1f5f9",
+                color: c.investment_rating === "强烈推荐" ? "#dc2626" :
+                       c.investment_rating === "推荐" ? "#0d9488" :
+                       c.investment_rating === "关注" ? "#92400e" : "#64748b",
+              }}>
+                {c.investment_rating}
+              </span>
+            )}
           </div>
 
           {/* Card body */}
@@ -56,6 +69,36 @@ export default function LogicCards({ companies }: Props) {
               <span className="text-[9px] uppercase tracking-widest text-[#94a3b8] font-bold">投资逻辑</span>
               <p className="text-[12px] text-[#475569] leading-relaxed mt-1">{c.investment_logic}</p>
             </div>
+
+            {c.moat_assessment && (
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", color: "#94a3b8", fontWeight: 600 }}>
+                  护城河评估
+                </span>
+                <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+                  {[
+                    { key: "intangible_assets", label: "无形资产" },
+                    { key: "switching_costs", label: "转换成本" },
+                    { key: "network_effects", label: "网络效应" },
+                    { key: "cost_advantage", label: "成本优势" },
+                  ].map(({ key, label }) => {
+                    const score = (c.moat_assessment as any)[key] || 50;
+                    return (
+                      <div key={key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ width: 56, fontSize: 10, color: "#94a3b8", textAlign: "right", flexShrink: 0 }}>{label}</span>
+                        <div style={{ flex: 1, height: 4, background: "#e5e7eb", borderRadius: 2 }}>
+                          <div style={{
+                            width: `${score}%`, height: "100%", borderRadius: 2,
+                            background: score >= 70 ? "#0d9488" : score >= 40 ? "#d97706" : "#dc2626",
+                          }} />
+                        </div>
+                        <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600, width: 24 }}>{score}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Key variables */}
             {c.key_variables.length > 0 && (
@@ -76,6 +119,31 @@ export default function LogicCards({ companies }: Props) {
               </div>
             )}
 
+            {c.catalysts && c.catalysts.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em", color: "#0d9488", fontWeight: 600 }}>
+                  催化剂
+                </span>
+                <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {c.catalysts.map((cat, ci) => (
+                    <div key={ci} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                      <span style={{
+                        fontSize: 10, padding: "1px 5px", borderRadius: 4, fontWeight: 600, flexShrink: 0,
+                        background: cat.impact === "高" ? "#fef2f2" : cat.impact === "中" ? "#fef3c7" : "#f1f5f9",
+                        color: cat.impact === "高" ? "#dc2626" : cat.impact === "中" ? "#92400e" : "#64748b",
+                      }}>
+                        {cat.impact}
+                      </span>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: 11, color: "#0f172a", fontWeight: 600 }}>{cat.event}</span>
+                        <span style={{ fontSize: 10, color: "#94a3b8", marginLeft: 6 }}>{cat.timeframe}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Risks */}
             {c.risks.length > 0 && (
               <div>
@@ -88,6 +156,11 @@ export default function LogicCards({ companies }: Props) {
                       </div>
                       {typeof r !== "string" && r.detail && (
                         <div className="text-[11px] text-[#64748b] leading-relaxed">{r.detail}</div>
+                      )}
+                      {typeof r !== "string" && r.falsifiable_condition && (
+                        <div style={{ marginTop: 4, fontSize: 10, color: "#b45309", fontStyle: "italic", background: "#fffbeb", padding: "4px 8px", borderRadius: 4 }}>
+                          证伪条件: {r.falsifiable_condition}
+                        </div>
                       )}
                     </div>
                   ))}
