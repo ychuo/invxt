@@ -22,6 +22,37 @@ export default function ThemeSummary({ theme }: ThemeSummaryProps) {
           </span>
         ))}
       </div>
+
+        {theme.lifecycle_stage && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #f0f0f0" }}>
+            <span style={{
+              display: "inline-block",
+              fontSize: 10, padding: "2px 8px", borderRadius: 100, fontWeight: 600,
+              background: theme.lifecycle_stage === "成长期" ? "#dcfce7" :
+                          theme.lifecycle_stage === "导入期" ? "#fef3c7" :
+                          theme.lifecycle_stage === "成熟期" ? "#dbeafe" : "#f1f5f9",
+              color: theme.lifecycle_stage === "成长期" ? "#166534" :
+                     theme.lifecycle_stage === "导入期" ? "#92400e" :
+                     theme.lifecycle_stage === "成熟期" ? "#1e40af" : "#64748b",
+            }}>
+              {theme.lifecycle_stage}
+            </span>
+          </div>
+        )}
+
+        {theme.tam_description && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #f0f0f0" }}>
+            <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", color: "#94a3b8", fontWeight: 600, display: "block", marginBottom: 4 }}>市场空间</span>
+            <p style={{ fontSize: 12, color: "#475569", lineHeight: 1.7 }}>{theme.tam_description}</p>
+          </div>
+        )}
+
+        {theme.policy_analysis && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #f0f0f0" }}>
+            <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", color: "#94a3b8", fontWeight: 600, display: "block", marginBottom: 4 }}>政策环境</span>
+            <p style={{ fontSize: 12, color: "#475569", lineHeight: 1.7 }}>{theme.policy_analysis}</p>
+          </div>
+        )}
     </div>
   );
 }
