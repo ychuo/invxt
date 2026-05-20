@@ -167,8 +167,9 @@ async def analyze_stream(req: AnalyzeRequest):
                                 pass
 
                         await q.put(event)
-                        # Skip internal tool_call/tool_result for emit_conclusion/emit_correction
-                        if etype in ("tool_call", "tool_result") and event.get("name") in ("emit_conclusion", "emit_correction"):
+                        # Skip internal tool_call/tool_result for emit_* tools
+                        _emit_tools = ("emit_theme", "emit_chain", "emit_companies", "emit_logic", "emit_correction")
+                        if etype in ("tool_call", "tool_result") and event.get("name", "").startswith("emit_"):
                             continue
                         thinking_entries.append(event)
                         if etype == "conclusion":
@@ -233,6 +234,74 @@ async def analyze_stream(req: AnalyzeRequest):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+def _normalize_theme(content: dict) -> dict:
+    """Normalize model output to expected theme schema."""
+    if not isinstance(content, dict):
+        return content
+    # Map common alternative field names
+    if "theme_name" not in content:
+        content["theme_name"] = content.get("topic") or content.get("name") or ""
+    if "summary" not in content:
+        content["summary"] = content.get("definition") or content.get("description") or ""
+    if "category" not in content:
+        content["category"] = content.get("sector") or ""
+    if "directions" not in content:
+        directions = content.get("directions") or content.get("segments") or []
+        if isinstance(directions, list) and len(directions) > 0:
+            content["directions"] = directions
+        else:
+            content["directions"] = []
+    # Normalize lifecycle
+    lc = content.get("lifecycle")
+    if isinstance(lc, dict) and "lifecycle_stage" not in content:
+        content["lifecycle_stage"] = lc.get("stage") or lc.get("phase") or str(lc)
+    elif isinstance(lc, str) and "lifecycle_stage" not in content:
+        content["lifecycle_stage"] = lc
+    # Normalize market space
+    ms = content.get("market_space")
+    if isinstance(ms, dict) and "tam_description" not in content:
+        parts = []
+        for k, v in ms.items():
+            if isinstance(v, list):
+                parts.append(f"{k}: {', '.join(str(x) for x in v)}")
+            else:
+                parts.append(f"{k}: {v}")
+        content["tam_description"] = "; ".join(parts)
+    elif isinstance(ms, str) and "tam_description" not in content:
+        content["tam_description"] = ms
+    # Normalize policy
+    pol = content.get("policy_environment")
+    if isinstance(pol, dict) and "policy_analysis" not in content:
+        pos = pol.get("positive", [])
+        neg = pol.get("negative", [])
+        parts = []
+        if pos:
+            parts.append("利好: " + "; ".join(str(x) for x in pos))
+        if neg:
+            parts.append("风险: " + "; ".join(str(x) for x in neg))
+        content["policy_analysis"] = "\n".join(parts)
+    elif isinstance(pol, str) and "policy_analysis" not in content:
+        content["policy_analysis"] = pol
+    return content
+
+
+def _normalize_companies(content: list) -> list:
+    """Ensure company entries have expected field names."""
+    if not isinstance(content, list):
+        return content
+    for c in content:
+        if isinstance(c, dict):
+            if "company_name" not in c:
+                c["company_name"] = c.get("name") or c.get("company") or ""
+            if "ticker" not in c:
+                c["ticker"] = c.get("code") or c.get("symbol") or ""
+            if "market" not in c and "exchange" in c:
+                c["market"] = c["exchange"]
+            if "market" in c and isinstance(c["market"], str):
+                c["market"] = c["market"].upper()
+    return content
 
 
 async def _save_state(task_id: str, topic: str, market: str, blocks: dict, thinking: list, status: str):

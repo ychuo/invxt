@@ -71,19 +71,175 @@ TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "emit_conclusion",
-            "description": "当分析得出一个确定结论时调用，将结论同步到分析报告对应区块。这是将思考转化为可见结果的机制。",
+            "name": "emit_theme",
+            "description": "产出 Step 1 主题理解结论（必须调用）或 Step 6 执行摘要（补充 executive_summary 字段）。",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "block": {
-                        "type": "string",
-                        "enum": ["theme", "chain", "companies", "logic"],
-                        "description": "目标区块",
+                    "theme_name": {"type": "string", "description": "规范化主题名称"},
+                    "category": {"type": "string", "description": "产业分类（半导体/人工智能/新能源等）"},
+                    "summary": {"type": "string", "description": "一句话概述核心投资逻辑"},
+                    "lifecycle_stage": {"type": "string", "enum": ["导入期", "成长期", "成熟期", "衰退期"], "description": "产业生命周期阶段"},
+                    "tam_description": {"type": "string", "description": "市场空间描述（TAM规模、增长驱动、3-5年CAGR）"},
+                    "policy_analysis": {"type": "string", "description": "产业政策环境分析"},
+                    "directions": {
+                        "type": "array",
+                        "description": "3-6个核心技术/产业方向",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string", "description": "技术方向名"},
+                                "position": {"type": "string", "description": "上游/中游/下游"},
+                                "description": {"type": "string", "description": "与主题的产业关联逻辑"},
+                            },
+                            "required": ["name", "position", "description"],
+                        },
                     },
-                    "content": {"type": "string", "description": "区块内容（JSON 字符串，结构与当前 pipeline 输出一致）"},
+                    "executive_summary": {
+                        "type": "object",
+                        "description": "Step 6 执行摘要（仅在Step 6调用时填写）",
+                        "properties": {
+                            "theme_definition": {"type": "string"},
+                            "lifecycle_and_market": {"type": "string"},
+                            "core_links": {"type": "string"},
+                            "top_picks": {"type": "array", "items": {"type": "object", "properties": {"company_name": {"type": "string"}, "ticker": {"type": "string"}, "rating": {"type": "string"}, "logic": {"type": "string"}}, "required": ["company_name", "ticker", "rating", "logic"]}},
+                            "biggest_mispricing": {"type": "string"},
+                            "key_catalysts": {"type": "string"},
+                        },
+                    },
                 },
-                "required": ["block", "content"],
+                "required": ["theme_name", "category", "summary", "directions"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "emit_chain",
+            "description": "产出 Step 2 产业链深度拆解结论。针对每个技术方向拆解上下游。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "chains": {
+                        "type": "array",
+                        "description": "产业链拆解数组，每个元素对应一个技术方向",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "direction": {"type": "string", "description": "技术方向名"},
+                                "upstream": {"type": "array", "items": {"type": "string"}, "description": "上游环节"},
+                                "midstream": {"type": "array", "items": {"type": "string"}, "description": "中游环节"},
+                                "downstream": {"type": "array", "items": {"type": "string"}, "description": "下游环节"},
+                                "key_materials": {"type": "array", "items": {"type": "string"}, "description": "关键材料"},
+                                "key_equipment": {"type": "array", "items": {"type": "string"}, "description": "关键设备"},
+                                "profit_pool": {"type": "string", "description": "利润池分析（毛利率水平、议价能力）"},
+                                "concentration": {"type": "string", "description": "行业集中度（CR4/CR8估算）"},
+                                "localization_rate": {"type": "string", "description": "国产化率估算"},
+                            },
+                            "required": ["direction", "upstream", "midstream", "downstream"],
+                        },
+                    },
+                },
+                "required": ["chains"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "emit_companies",
+            "description": "产出 Step 3 核心公司全量映射结论。全量映射 8-15 家，标注 3-5 家深度调研。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "companies": {
+                        "type": "array",
+                        "description": "公司列表",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "company_name": {"type": "string", "description": "公司简称（股市常用简称）"},
+                                "ticker": {"type": "string", "description": "股票代码（A股: XXXXXX.SH/SZ, 美股: TICKER）"},
+                                "market": {"type": "string", "enum": ["A", "US"], "description": "上市市场"},
+                                "reasoning": {"type": "string", "description": "为什么这家公司与该产业链相关"},
+                                "relevance": {"type": "string", "enum": ["核心", "重要", "一般"], "description": "关联程度"},
+                                "selected_for_deep_research": {"type": "boolean", "description": "是否入选深度调研（3-5家为true）"},
+                                "selection_reason": {"type": "string", "description": "入选深度调研的理由"},
+                                "industry_position": {"type": "string", "description": "公司在产业链中的位置"},
+                            },
+                            "required": ["company_name", "ticker", "market", "reasoning", "relevance"],
+                        },
+                    },
+                },
+                "required": ["companies"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "emit_logic",
+            "description": "产出 Step 5 投资评级与逻辑梳理结论。只对深度调研的 3-5 家公司产出。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "companies": {
+                        "type": "array",
+                        "description": "深度调研公司列表",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "company_name": {"type": "string"},
+                                "ticker": {"type": "string"},
+                                "market": {"type": "string", "enum": ["A", "US"]},
+                                "revenue_tier": {"type": "string", "enum": ["core", "important", "marginal", "concept"]},
+                                "market_awareness": {"type": "string", "enum": ["priced_in", "partially_recognized", "under_the_radar"]},
+                                "investment_logic": {"type": "string", "description": "3-5句投资逻辑"},
+                                "investment_rating": {"type": "string", "enum": ["强烈推荐", "推荐", "关注", "回避"]},
+                                "moat_assessment": {
+                                    "type": "object",
+                                    "properties": {
+                                        "intangible_assets": {"type": "integer", "minimum": 0, "maximum": 100},
+                                        "switching_costs": {"type": "integer", "minimum": 0, "maximum": 100},
+                                        "network_effects": {"type": "integer", "minimum": 0, "maximum": 100},
+                                        "cost_advantage": {"type": "integer", "minimum": 0, "maximum": 100},
+                                    },
+                                    "required": ["intangible_assets", "switching_costs", "network_effects", "cost_advantage"],
+                                },
+                                "catalysts": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "event": {"type": "string"},
+                                            "timeframe": {"type": "string"},
+                                            "impact": {"type": "string", "enum": ["高", "中", "低"]},
+                                        },
+                                        "required": ["event", "timeframe", "impact"],
+                                    },
+                                },
+                                "key_variables": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {"name": {"type": "string"}, "detail": {"type": "string"}},
+                                        "required": ["name", "detail"],
+                                    },
+                                },
+                                "risks": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {"risk": {"type": "string"}, "detail": {"type": "string"}, "falsifiable_condition": {"type": "string"}},
+                                        "required": ["risk", "detail"],
+                                    },
+                                },
+                            },
+                            "required": ["company_name", "ticker", "market", "revenue_tier", "market_awareness", "investment_logic", "investment_rating", "moat_assessment", "key_variables", "risks"],
+                        },
+                    },
+                },
+                "required": ["companies"],
             },
         },
     },
@@ -113,11 +269,11 @@ SYSTEM_PROMPT = """你是一个产业投资主题分析专家。你必须严格�
 
 ### Step 1 — 主题理解与产业定位
 搞清楚主题定义、产业生命周期（导入期/成长期/成熟期/衰退期，估算渗透率）、市场空间（TAM、增长驱动因素、3-5 年 CAGR）、产业政策环境。
-产出：emit_conclusion(block="theme", content={...})
+产出：emit_theme(theme_name="...", category="...", summary="...", directions=[...], lifecycle_stage="...", tam_description="...", policy_analysis="...")
 
 ### Step 2 — 产业链深度拆解
 针对每个技术方向拆解上下游、关键材料、关键设备，同时分析每个环节的利润池（毛利率水平、议价能力）、行业集中度（CR4/CR8 估算）、国产化率估算。
-产出：emit_conclusion(block="chain", content=[{...}])
+产出：emit_chain(chains=[{direction, upstream, midstream, downstream, key_materials, key_equipment, profit_pool, concentration, localization_rate}])
 
 ### Step 3 — 核心公司全量映射
 产业链每个关键环节找到 A 股/美股上市公司，全量映射 8-15 家。对每家公司标注：
@@ -125,7 +281,7 @@ SYSTEM_PROMPT = """你是一个产业投资主题分析专家。你必须严格�
 - selection_reason: 入选理由（业务纯度/产业链卡位/预期差/代表性）
 - industry_position: 产业链位置描述
 筛选标准：主题关联营收占比高、处于利润池集中环节、市场认知不足、覆盖不同投资风格。
-产出：emit_conclusion(block="companies", content=[{...}])
+产出：emit_companies(companies=[{company_name, ticker, market, reasoning, relevance, selected_for_deep_research, selection_reason, industry_position}])
 
 ### Step 4 — 精选公司深度调研
 只调研 selected_for_deep_research=true 的 3-5 家公司：
@@ -136,26 +292,12 @@ SYSTEM_PROMPT = """你是一个产业投资主题分析专家。你必须严格�
 不 emit 独立区块，信息作为 Step 5 输入。
 
 ### Step 5 — 投资评级与逻辑梳理
-基于前四步所有信息，对深度调研公司逐家产出完整评估。每家公司必须包含：
-- revenue_tier: core/important/marginal/concept
-- market_awareness: priced_in/partially_recognized/under_the_radar
-- investment_logic: 3-5 句投资逻辑
-- moat_assessment: {intangible_assets: 0-100, switching_costs: 0-100, network_effects: 0-100, cost_advantage: 0-100}
-- investment_rating: 强烈推荐/推荐/关注/回避
-- catalysts: [{event, timeframe, impact: "高/中/低"}]
-- key_variables: [{name, detail}]
-- risks: [{risk, detail, falsifiable_condition}]
-产出：emit_conclusion(block="logic", content=[{...}])
+基于前四步所有信息，对深度调研公司逐家产出完整评估。
+产出：emit_logic(companies=[{company_name, ticker, market, revenue_tier, market_awareness, investment_logic, investment_rating, moat_assessment, catalysts, key_variables, risks}])
 
 ### Step 6 — 执行摘要
-在完成所有分析后，补充执行摘要：
-- 主题一句话定义
-- 产业生命周期 + 市场空间
-- 产业链核心环节和利润集中点
-- 2-3 个核心推荐标的（公司名+代码+评级+一句话逻辑）
-- 最大预期差
-- 关键催化剂时间线
-产出：emit_conclusion(block="theme", content={...executive_summary...})（追加到 theme 区块）
+在完成所有分析后，补充执行摘要，调用 emit_theme 只传 executive_summary 字段：
+产出：emit_theme(executive_summary={theme_definition, lifecycle_and_market, core_links, top_picks, biggest_mispricing, key_catalysts})
 
 ## 分析角度参考
 
@@ -212,7 +354,7 @@ class AgenticAnalyzer:
         elif name == "query_knowledge_graph":
             result = self._neo4j.find_entity(args["entity_name"])
             return json.dumps(result, ensure_ascii=False) if result else "未找到"
-        elif name in ("emit_conclusion", "emit_correction"):
+        elif name in ("emit_theme", "emit_chain", "emit_companies", "emit_logic", "emit_correction"):
             return "ok"
         return "unknown tool"
 
@@ -314,13 +456,18 @@ class AgenticAnalyzer:
                     result = await self._execute_tool(name, args)
                     yield {"type": "tool_result", "name": name, "result": result}
 
-                    # Special handling for emit_conclusion / emit_correction
-                    if name == "emit_conclusion":
-                        yield {
-                            "type": "conclusion",
-                            "block": args.get("block", ""),
-                            "content": args.get("content", ""),
-                        }
+                    # Special handling for emit_* tools — yield as conclusion/correction events
+                    if name == "emit_theme":
+                        yield {"type": "conclusion", "block": "theme", "content": json.dumps(args, ensure_ascii=False)}
+                    elif name == "emit_chain":
+                        chains = args.get("chains", args.get("chain", []))
+                        yield {"type": "conclusion", "block": "chain", "content": json.dumps(chains, ensure_ascii=False)}
+                    elif name == "emit_companies":
+                        companies = args.get("companies", [])
+                        yield {"type": "conclusion", "block": "companies", "content": json.dumps(companies, ensure_ascii=False)}
+                    elif name == "emit_logic":
+                        companies = args.get("companies", [])
+                        yield {"type": "conclusion", "block": "logic", "content": json.dumps(companies, ensure_ascii=False)}
                     elif name == "emit_correction":
                         yield {
                             "type": "correction",
