@@ -71,6 +71,11 @@ function AnalysisContent() {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [activeNav, setActiveNav] = useState("graph");
 
+  const handleRestart = useCallback(() => {
+    cancel();
+    start(topic, market);
+  }, [topic, market, start, cancel]);
+
   // On mount: check Redis cache first, otherwise start new stream
   useEffect(() => {
     if (!topic) return;
@@ -154,13 +159,29 @@ function AnalysisContent() {
           <span style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 700, color: "#111", lineHeight: "44px" }}>
             Inv<span style={{ background: "linear-gradient(135deg, #0d9488, #14b8a6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>X</span>t
           </span>
-          {(status === "streaming" || status === "error") && (
-            <span style={{
-              width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
-              background: status === "error" ? "#dc2626" : "#14b8a6",
-              animation: status === "streaming" ? "pulse 1.5s ease-in-out infinite" : "none",
-            }} />
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {status !== "idle" && (
+              <button
+                onClick={handleRestart}
+                style={{
+                  fontFamily: "var(--font-serif)",
+                  fontSize: 11, color: "#94a3b8", background: "none", border: "none",
+                  cursor: "pointer", padding: "4px 0",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#0d9488")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
+              >
+                重新调研
+              </button>
+            )}
+            {(status === "streaming" || status === "error") && (
+              <span style={{
+                width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                background: status === "error" ? "#dc2626" : "#14b8a6",
+                animation: status === "streaming" ? "pulse 1.5s ease-in-out infinite" : "none",
+              }} />
+            )}
+          </div>
         </div>
         <ThinkingStream entries={thinking} />
       </div>
