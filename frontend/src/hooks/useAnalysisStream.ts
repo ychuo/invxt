@@ -70,7 +70,12 @@ export function useAnalysisStream() {
               if (entry.type === "conclusion") {
                 try {
                   const content = JSON.parse(entry.content);
-                  next.blocks = { ...next.blocks, [entry.block]: content };
+                  // Merge theme updates (Step 6 adds executive_summary without full theme)
+                  if (entry.block === "theme" && next.blocks.theme && typeof next.blocks.theme === "object" && typeof content === "object" && !Array.isArray(content)) {
+                    next.blocks = { ...next.blocks, theme: { ...(next.blocks.theme as Record<string, unknown>), ...content } };
+                  } else {
+                    next.blocks = { ...next.blocks, [entry.block]: content };
+                  }
                 } catch {}
               }
               if (entry.type === "done") {

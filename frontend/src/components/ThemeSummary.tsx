@@ -13,7 +13,7 @@ export default function ThemeSummary({ theme }: ThemeSummaryProps) {
         <span className="px-3 py-1 bg-[#f0fdfa] text-[#0f766e] text-[11px] rounded-full border border-[#ccfbf1] font-bold">
           {theme.category}
         </span>
-        {theme.directions.slice(0, 4).map((d) => (
+        {theme.directions?.slice(0, 4).map((d) => (
           <span
             key={d.name}
             className="px-3 py-1 bg-[#f0fdfa] text-[#0f766e] text-[11px] rounded-full border border-[#ccfbf1]"

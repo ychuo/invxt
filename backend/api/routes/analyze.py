@@ -177,7 +177,11 @@ async def analyze_stream(req: AnalyzeRequest):
                                 content = json.loads(event.get("content", "")) if isinstance(event.get("content"), str) else event.get("content")
                             except (json.JSONDecodeError, TypeError):
                                 content = event.get("content")
-                            blocks[block] = content
+                            # Merge with existing block data (Step 6 may add executive_summary without full theme)
+                            if block == "theme" and isinstance(content, dict) and block in blocks and isinstance(blocks[block], dict):
+                                blocks[block] = {**blocks[block], **content}
+                            else:
+                                blocks[block] = content
                             await _save_state(task_id, req.topic, req.market, blocks, thinking_entries, "running")
                         elif etype == "correction":
                             await _save_state(task_id, req.topic, req.market, blocks, thinking_entries, "running")
