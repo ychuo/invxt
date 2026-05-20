@@ -66,9 +66,13 @@ export default function CompanyTable({ companies }: Props) {
           </tr>
         </thead>
         <tbody>
-          {companies.map((c, i) => (
-            <tr key={c.ticker} className="border-t border-[#f5f5f5] hover:bg-[#fafbfc] transition-colors">
-              <td className="p-3 text-[#94a3b8]">{i + 1}</td>
+          {companies.map((c, i) => {
+            const isDeepResearch = (c as any).selected_for_deep_research === true;
+            return (
+            <tr key={c.ticker} className={`border-t border-[#f5f5f5] hover:bg-[#fafbfc] transition-colors ${isDeepResearch ? "bg-[#fafdfc]" : ""}`}>
+              <td className="p-3" style={{ color: isDeepResearch ? "#0d9488" : "#94a3b8" }}>
+                {isDeepResearch ? "★" : (i + 1)}
+              </td>
               <td className="p-3">
                 <div className="font-bold text-[#0f172a]">{c.company_name}</div>
                 <div className="text-[10px] text-[#94a3b8] font-mono mt-0.5">{c.ticker}</div>
@@ -95,9 +99,15 @@ export default function CompanyTable({ companies }: Props) {
               </td>
               <td className="p-3 text-[12px] text-[#64748b] leading-relaxed">
                 {c.investment_logic}
+                {(c as any).selection_reason && (
+                  <div style={{ marginTop: 4, fontSize: 10, color: "#0d9488", fontWeight: 600 }}>
+                    入选理由: {(c as any).selection_reason}
+                  </div>
+                )}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
