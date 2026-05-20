@@ -11,6 +11,8 @@ import IndustryChainGraph from "@/components/IndustryChainGraph";
 import CompanyTable from "@/components/CompanyTable";
 import LogicCards from "@/components/LogicCards";
 import ProgressStepper from "@/components/ProgressStepper";
+import ExecutiveSummary from "@/components/ExecutiveSummary";
+import type { ExecutiveSummary as ExecSummaryType } from "@/types";
 
 function GraphIcon() {
   return (
@@ -41,6 +43,7 @@ function BlockHeader({ label, badge, meta }: { label: string; badge?: string; me
 }
 
 const NAV_ITEMS = [
+  { key: "summary", label: "摘要" },
   { key: "graph", label: "图谱" },
   { key: "table", label: "公司" },
   { key: "cards", label: "逻辑" },
@@ -95,7 +98,7 @@ function AnalysisContent() {
 
   // IntersectionObserver for sticky nav
   useEffect(() => {
-    const sectionIds = ["theme", "graph", "table", "cards"];
+    const sectionIds = ["summary", "theme", "graph", "table", "cards"];
     const sections = sectionIds.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
     if (sections.length === 0) return;
 
@@ -121,15 +124,15 @@ function AnalysisContent() {
   // Derive current step for ProgressStepper from blocks state
   const currentStep = status === "idle" || status === "error"
     ? ""
-    : blocks.logic != null
-      ? "done"
-      : blocks.companies != null
+    : (blocks.theme as any)?.executive_summary != null
+      ? "executive_summary"
+      : blocks.logic != null
         ? "scoring"
-        : blocks.chain != null
+        : blocks.companies != null
           ? "company_mapping"
-          : blocks.theme != null
+          : blocks.chain != null
             ? "chain_reasoning"
-            : status === "streaming"
+            : blocks.theme != null
               ? "theme_understanding"
               : "";
 
@@ -201,6 +204,13 @@ function AnalysisContent() {
             <div className="mb-6">
               <ProgressStepper currentStep={currentStep} />
             </div>
+          )}
+
+          {/* ===== Block: Executive Summary ===== */}
+          {blocks.theme != null && (blocks.theme as any).executive_summary != null && (
+            <section id="summary" className="mb-6">
+              <ExecutiveSummary data={(blocks.theme as any).executive_summary as ExecSummaryType} />
+            </section>
           )}
 
           {/* ===== Block: Theme Summary ===== */}

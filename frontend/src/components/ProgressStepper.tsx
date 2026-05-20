@@ -5,6 +5,7 @@ const STEPS = [
   { key: "chain_reasoning", label: "产业链" },
   { key: "company_mapping", label: "公司" },
   { key: "scoring", label: "评分" },
+  { key: "executive_summary", label: "摘要" },
 ];
 
 interface ProgressStepperProps {
