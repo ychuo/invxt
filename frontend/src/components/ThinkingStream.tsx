@@ -45,8 +45,14 @@ function pairEntries(entries: ThinkingEntry[]): RenderItem[] {
       items.push({ type: "tool", name: e.name, result: e.result, key: `t-${i}` });
       i++;
     } else if (e.type === "thinking") {
-      items.push({ type: "thinking", text: e.text, key: `th-${i}` });
+      // Merge consecutive thinking entries into one flowing paragraph
+      let merged = e.text;
       i++;
+      while (i < entries.length && entries[i].type === "thinking") {
+        merged += (entries[i] as { type: "thinking"; text: string }).text;
+        i++;
+      }
+      items.push({ type: "thinking", text: merged, key: `th-${i}` });
     } else if (e.type === "conclusion") {
       items.push({ type: "conclusion", block: e.block, key: `c-${i}` });
       i++;
