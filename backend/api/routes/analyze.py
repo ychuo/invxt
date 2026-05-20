@@ -142,8 +142,8 @@ async def analyze_stream(req: AnalyzeRequest):
                     if etype == "thinking":
                         thinking_buf += event.get("text", "")
                         now = asyncio.get_event_loop().time()
-                        # Flush every 2s or every ~200 chars for smooth display
-                        if len(thinking_buf) >= 200 or now - last_flush >= 2.0:
+                        # Flush frequently for typewriter effect
+                        if len(thinking_buf) >= 50 or now - last_flush >= 0.3:
                             if thinking_buf.strip():
                                 flush_event = {"type": "thinking", "text": thinking_buf}
                                 await q.put(flush_event)
