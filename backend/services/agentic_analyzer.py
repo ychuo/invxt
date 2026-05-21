@@ -466,13 +466,23 @@ class AgenticAnalyzer:
                     raw_args = tc["function"]["arguments"]
                     try:
                         args = json.loads(raw_args) if raw_args.strip() else {}
-                    except json.JSONDecodeError as e:
-                        print(f"[AgenticAnalyzer] JSON parse error for {name}: {e}", file=sys.stderr)
-                        result = json.dumps({"error": f"JSON parse error: {e}"}, ensure_ascii=False)
-                        yield {"type": "tool_call", "name": name, "args": {}}
-                        yield {"type": "tool_result", "name": name, "result": result}
-                        messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result[:8000]})
-                        continue
+                    except json.JSONDecodeError:
+                        # Try recovering by truncating to last complete object/array
+                        args = {}
+                        for trim_at in range(len(raw_args) - 1, 0, -1):
+                            try:
+                                args = json.loads(raw_args[:trim_at])
+                                print(f"[AgenticAnalyzer] {name}: recovered JSON by trimming {len(raw_args)-trim_at} chars", file=sys.stderr)
+                                break
+                            except json.JSONDecodeError:
+                                continue
+                        if not args:
+                            print(f"[AgenticAnalyzer] {name}: unrecoverable JSON, len={len(raw_args)}", file=sys.stderr)
+                            result = json.dumps({"error": "JSON parse error"}, ensure_ascii=False)
+                            yield {"type": "tool_call", "name": name, "args": {}}
+                            yield {"type": "tool_result", "name": name, "result": result}
+                            messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result[:8000]})
+                            continue
                     yield {"type": "tool_call", "name": name, "args": args}
 
                     try:

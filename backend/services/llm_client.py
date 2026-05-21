@@ -99,6 +99,7 @@ class LLMClient:
             model=self._model,
             messages=messages,
             stream=True,
+            max_tokens=16384,
             reasoning_effort="high",
             extra_body={"thinking": {"type": "enabled"}},
         )
