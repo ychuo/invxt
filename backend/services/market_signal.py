@@ -1,7 +1,9 @@
 """Per-stock market signal fetcher for scoring context."""
 from __future__ import annotations
+import asyncio
 import math
 import os
+import random
 import sys
 
 # 禁用代理，akshare 直连东方财富等数据源
@@ -49,6 +51,20 @@ def _parse_net_amount(value: str) -> float | None:
         return None
 
 
+async def _fetch_with_retry(ticker: str, fetch_fn, max_retries: int = 3):
+    """Retry a fetch with exponential backoff and jitter for rate limiting."""
+    for attempt in range(max_retries):
+        try:
+            return await fetch_fn(ticker)
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise
+            delay = (2 ** attempt) + random.uniform(0, 1)
+            print(f"[market_signal] retry {ticker} in {delay:.1f}s: {type(e).__name__}", file=sys.stderr)
+            await asyncio.sleep(delay)
+    return None
+
+
 async def _fetch_a_share(
     tickers: list[str],
 ) -> dict[str, dict[str, float | None]]:
@@ -69,16 +85,29 @@ async def _fetch_a_share(
         print(f"[market_signal] fund_flow fetch failed: {type(e).__name__}: {e}", file=sys.stderr)
 
     for ticker in tickers:
+        # Small delay between tickers to avoid rate limiting
+        if len(results) > 0:
+            await asyncio.sleep(random.uniform(0.3, 0.8))
+
         # Strip exchange suffix for matching: "600584.SH" → "600584"
         clean_ticker = ticker.split(".")[0] if "." in ticker else ticker
         try:
-            df = ak.stock_zh_a_hist(
-                symbol=clean_ticker,
-                period="daily",
-                start_date="20250101",
-                end_date="20991231",
-                adjust="qfq",
-            )
+            # Retry up to 3 times with backoff
+            df = None
+            for attempt in range(3):
+                try:
+                    df = ak.stock_zh_a_hist(
+                        symbol=clean_ticker,
+                        period="daily",
+                        start_date="20250101",
+                        end_date="20991231",
+                        adjust="qfq",
+                    )
+                    break
+                except Exception as e:
+                    if attempt == 2:
+                        raise
+                    await asyncio.sleep((2 ** attempt) + random.uniform(0, 1))
             if df is None or len(df) < 22:
                 print(f"[market_signal] A-share {ticker}: insufficient data (rows={len(df) if df is not None else 0})", file=sys.stderr)
                 continue
