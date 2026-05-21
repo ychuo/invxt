@@ -205,8 +205,6 @@ export default function ThinkingStream({ entries }: { entries: ThinkingEntry[] }
       lineHeight: 1.85,
       color: "#475569",
       padding: "20px 0 32px",
-      height: "100%",
-      overflowY: "auto",
     }}>
       {items.length === 0 && (
         <div className="flex items-center gap-3 text-[#94a3b8]" style={{ fontFamily: "var(--font-serif)" }}>
