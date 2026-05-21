@@ -195,7 +195,7 @@ function AnalysisContent() {
           </div>
         </div>
         <div className="max-w-3xl mx-auto px-6 w-full" style={{ flex: 1 }}>
-          <ThinkingStream entries={thinking} />
+          <ThinkingStream entries={thinking} status={status} />
         </div>
       </div>
 

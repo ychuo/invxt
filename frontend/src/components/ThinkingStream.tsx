@@ -182,10 +182,10 @@ function ThinkingBlock({ text, isStreaming }: { text: string; isStreaming: boole
 
 // ── Main component ──
 
-export default function ThinkingStream({ entries }: { entries: ThinkingEntry[] }) {
+export default function ThinkingStream({ entries, status }: { entries: ThinkingEntry[]; status?: string }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const items = useMemo(() => pairEntries(entries), [entries]);
-  const isStreaming = entries.length > 0 && entries[entries.length - 1].type !== "done";
+  const isStreaming = status === "streaming" && entries.length > 0 && entries[entries.length - 1].type !== "done";
 
   const lastThinkingIdx = useMemo(() => {
     for (let i = items.length - 1; i >= 0; i--) {
