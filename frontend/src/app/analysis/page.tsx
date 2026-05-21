@@ -155,7 +155,7 @@ function AnalysisContent() {
     <main className="h-screen flex overflow-hidden" style={{ fontFamily: "var(--font-serif)" }}>
       {/* ===== Left: Thinking Stream ===== */}
       <div style={{ flex: 1, borderRight: "1px solid #e5e7eb", background: "#fafbfc", height: "100vh", display: "flex", flexDirection: "column", minWidth: 400, overflowY: "auto" }}>
-        <div style={{ borderBottom: "1px solid #f0f0f0", background: "#fff", height: 44, display: "flex", alignItems: "center" }}>
+        <div className="sticky top-0 z-10" style={{ borderBottom: "1px solid #f0f0f0", background: "#fff", height: 44, display: "flex", alignItems: "center" }}>
           <div className="max-w-3xl mx-auto flex items-center justify-between px-6 w-full">
             <span style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 700, color: "#111", lineHeight: "44px" }}>
               Inv<span style={{ background: "linear-gradient(135deg, #0d9488, #14b8a6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>X</span>t
