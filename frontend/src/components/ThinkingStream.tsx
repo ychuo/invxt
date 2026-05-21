@@ -204,7 +204,7 @@ export default function ThinkingStream({ entries }: { entries: ThinkingEntry[] }
       fontSize: 13,
       lineHeight: 1.85,
       color: "#475569",
-      padding: "20px 24px 32px",
+      padding: "20px 0 32px",
       height: "100%",
       overflowY: "auto",
     }}>

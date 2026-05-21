@@ -154,45 +154,49 @@ function AnalysisContent() {
   return (
     <main className="h-screen flex overflow-hidden" style={{ fontFamily: "var(--font-serif)" }}>
       {/* ===== Left: Thinking Stream ===== */}
-      <div style={{ flex: 1, borderRight: "1px solid #e5e7eb", background: "#fafbfc", height: "100vh", display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <div style={{ padding: "0 24px", borderBottom: "1px solid #f0f0f0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", height: 44 }}>
-          <span style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 700, color: "#111", lineHeight: "44px" }}>
-            Inv<span style={{ background: "linear-gradient(135deg, #0d9488, #14b8a6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>X</span>t
-          </span>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {status !== "idle" && (
-              <button
-                onClick={handleRestart}
-                style={{
-                  fontFamily: "var(--font-serif)",
-                  fontSize: 11, color: "#94a3b8",
-                  background: "none", border: "1px solid #e5e7eb",
-                  borderRadius: 6, cursor: "pointer",
-                  padding: "3px 10px",
-                  transition: "border-color 0.15s, color 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = "#0d9488";
-                  e.currentTarget.style.borderColor = "#0d9488";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = "#94a3b8";
-                  e.currentTarget.style.borderColor = "#e5e7eb";
-                }}
-              >
-                重新调研
-              </button>
-            )}
-            {(status === "streaming" || status === "error") && (
-              <span style={{
-                width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
-                background: status === "error" ? "#dc2626" : "#14b8a6",
-                animation: status === "streaming" ? "pulse 1.5s ease-in-out infinite" : "none",
-              }} />
-            )}
+      <div style={{ flex: 1, borderRight: "1px solid #e5e7eb", background: "#fafbfc", height: "100vh", display: "flex", flexDirection: "column", minWidth: 400 }}>
+        <div style={{ borderBottom: "1px solid #f0f0f0", background: "#fff", height: 44, display: "flex", alignItems: "center" }}>
+          <div className="max-w-3xl mx-auto flex items-center justify-between px-6 w-full">
+            <span style={{ fontFamily: "var(--font-serif)", fontSize: 15, fontWeight: 700, color: "#111", lineHeight: "44px" }}>
+              Inv<span style={{ background: "linear-gradient(135deg, #0d9488, #14b8a6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>X</span>t
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {status !== "idle" && (
+                <button
+                  onClick={handleRestart}
+                  style={{
+                    fontFamily: "var(--font-serif)",
+                    fontSize: 11, color: "#94a3b8",
+                    background: "none", border: "1px solid #e5e7eb",
+                    borderRadius: 6, cursor: "pointer",
+                    padding: "3px 10px",
+                    transition: "border-color 0.15s, color 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "#0d9488";
+                    e.currentTarget.style.borderColor = "#0d9488";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "#94a3b8";
+                    e.currentTarget.style.borderColor = "#e5e7eb";
+                  }}
+                >
+                  重新调研
+                </button>
+              )}
+              {(status === "streaming" || status === "error") && (
+                <span style={{
+                  width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                  background: status === "error" ? "#dc2626" : "#14b8a6",
+                  animation: status === "streaming" ? "pulse 1.5s ease-in-out infinite" : "none",
+                }} />
+              )}
+            </div>
           </div>
         </div>
-        <ThinkingStream entries={thinking} />
+        <div className="max-w-3xl mx-auto px-6 w-full" style={{ flex: 1, overflow: "hidden" }}>
+          <ThinkingStream entries={thinking} />
+        </div>
       </div>
 
       {/* ===== Right: Analysis Report ===== */}
