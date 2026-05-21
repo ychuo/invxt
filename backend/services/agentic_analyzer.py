@@ -464,7 +464,15 @@ class AgenticAnalyzer:
                 for tc in tool_calls_buf:
                     name = tc["function"]["name"]
                     raw_args = tc["function"]["arguments"]
-                    args = json.loads(raw_args) if raw_args.strip() else {}
+                    try:
+                        args = json.loads(raw_args) if raw_args.strip() else {}
+                    except json.JSONDecodeError as e:
+                        print(f"[AgenticAnalyzer] JSON parse error for {name}: {e}", file=sys.stderr)
+                        result = json.dumps({"error": f"JSON parse error: {e}"}, ensure_ascii=False)
+                        yield {"type": "tool_call", "name": name, "args": {}}
+                        yield {"type": "tool_result", "name": name, "result": result}
+                        messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result[:8000]})
+                        continue
                     yield {"type": "tool_call", "name": name, "args": args}
 
                     try:
